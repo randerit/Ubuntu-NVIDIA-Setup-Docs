@@ -1,6 +1,6 @@
 # Guía Mejorada de Configuración de Estaciones de Trabajo Ubuntu con GPU NVIDIA
 
-> **Última actualización:** 16 de Octubre de 2025
+> **Última actualización:** 30 de Noviembre de 2025
 
 ---
 
