@@ -1,48 +1,48 @@
-# Improved Guide for Configuring Ubuntu Workstations with NVIDIA GPUs
+# Guía Mejorada de Configuración de Estaciones de Trabajo Ubuntu con GPU NVIDIA
 
-> **Last update:** October 16, 2025
-
----
-
-## Table of Contents
-
-* [1. Pre-Installation Requirements](#1-pre-installation-requirements)
-* [2. Ubuntu System Installation](#2-ubuntu-system-installation)
-* [3. Initial Ubuntu System Preparation](#3-initial-ubuntu-system-preparation)
-* [4. Installing NVIDIA Drivers on Ubuntu](#4-installing-nvidia-drivers-on-ubuntu)
-* [5. Installing CUDA Toolkit](#5-installing-cuda-toolkit)
-* [6. Specific Configuration for Compression Stations](#6-specific-configuration-for-compression-stations)
-* [7. Specific Configuration for Analytics Stations](#7-specific-configuration-for-analytics-stations)
-* [8. Graphical Interface Management](#8-graphical-interface-management)
-* [9. Troubleshooting Common Network Issues on New Motherboards](#9-troubleshooting-common-network-issues-on-new-motherboards)
-* [10. Wake-on-LAN (WOL): Windows to Windows and Ubuntu to Windows](#10-wake-on-lan-wol-windows-to-windows-and-ubuntu-to-windows)
-* [11. Post-Installation Script (Optional)](#11-post-installation-script-optional)
-* [12. Security Best Practices (Optional)](#12-security-best-practices-optional)
-* [FAQ: Frequently Asked Questions](#faq-frequently-asked-questions)
-* [Appendix A: Identifying NVIDIA GPUs](#appendix-a-identifying-nvidia-gpus)
-* [Appendix B: Compatibility Verification](#appendix-b-compatibility-verification)
+> **Última actualización:** 30 de Noviembre de 2025
 
 ---
 
-> **Welcome!** This improved guide will help you install and configure Ubuntu with NVIDIA GPUs, optimizing each step and explaining the reasoning behind each action. The original commands and procedures are maintained intact, but explanations, tips, and warnings have been added to facilitate the process.
+## Índice
+
+* [1. Requisitos Previos a la Instalación](#1-requisitos-previos-a-la-instalación)
+* [2. Instalación del Sistema Ubuntu](#2-instalación-del-sistema-ubuntu)
+* [3. Preparación Inicial del Sistema Ubuntu](#3-preparación-inicial-del-sistema-ubuntu)
+* [4. Instalación de Drivers de NVIDIA en Ubuntu](#4-instalación-de-drivers-de-nvidia-en-ubuntu)
+* [5. Instalación de CUDA Toolkit](#5-instalación-de-cuda-toolkit)
+* [6. Configuración Específica para Estaciones de Compresión](#6-configuración-específica-para-estaciones-de-compresión)
+* [7. Configuración Específica para Estaciones de Analítica](#7-configuración-específica-para-estaciones-de-analítica)
+* [8. Gestión de la Interfaz Gráfica](#8-gestión-de-la-interfaz-gráfica)
+* [9. Solución de Problemas Comunes con Redes en Placas Nuevas](#9-solución-de-problemas-comunes-con-redes-en-placas-nuevas)
+* [10. Wake-on-LAN (WOL): Windows a Windows y Ubuntu a Windows](#10-wake-on-lan-wol-windows-a-windows-y-ubuntu-a-windows)
+* [11. Script de Post-Instalación (Opcional)](#11-script-de-post-instalación-opcional)
+* [12. Buenas Prácticas de Seguridad (Opcional)](#12-buenas-prácticas-de-seguridad-opcional)
+* [FAQ: Preguntas Frecuentes](#faq-preguntas-frecuentes)
+* [Anexo A: Identificación de GPUs NVIDIA](#anexo-a-identificación-de-gpus-nvidia)
+* [Anexo B: Verificación de Compatibilidad](#anexo-b-verificación-de-compatibilidad)
 
 ---
 
-## Visual Summary of the Process
-
-`BIOS/UEFI` → `Ubuntu Installation` → `System Preparation` → `NVIDIA Drivers` → `CUDA Toolkit` → `Specific Configuration`
+> **¡Bienvenido!** Esta guía mejorada te ayudará a instalar y configurar Ubuntu con GPU NVIDIA, optimizando cada paso y explicando el porqué de cada acción. Los comandos y procedimientos originales se mantienen intactos, pero se agregan explicaciones, tips y advertencias para facilitar el proceso.
 
 ---
 
-## 1. Pre-Installation Requirements
+## Resumen Visual del Proceso
 
-### What do you need before starting?
+`BIOS/UEFI` → `Instalación de Ubuntu` → `Preparación del Sistema` → `Drivers NVIDIA` → `CUDA Toolkit` → `Configuración Específica`
 
-* **Bootable USB drive** Use Ventoy or BalenaEtcher to create it.
-* **Ubuntu Desktop image** Download the recommended LTS version (22.04 or 24.04).
-* **Equipment purpose** Define if it will be for Compression/Data or Analytics.
+---
 
-> **Tip:** Ubuntu Desktop is the most standard and compatible option for this type of configurations.
+## 1. Requisitos Previos a la Instalación
+
+### ¿Qué necesitas antes de comenzar?
+
+* **Unidad USB booteable** Usa Ventoy o BalenaEtcher para crearla.
+* **Imagen de Ubuntu Desktop** Descarga la versión LTS recomendada (22.04 o 24.04).
+* **Propósito del equipo** Define si será para Compresión/Data o Analítica.
+
+> **Tip:** Ubuntu Desktop es la opción más estándar y compatible para este tipo de configuraciones.
 
 ---
 
