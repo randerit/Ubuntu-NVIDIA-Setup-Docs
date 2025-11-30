@@ -49,692 +49,1117 @@
 
 ## 2. Instalación del Sistema Ubuntu
 
+> **Nota:** Esta guía asume Ubuntu Desktop 24.04.1 LTS (la más reciente en 2025). Si usas 22.04 LTS, los pasos son similares, pero verifica enlaces de descarga. Asegúrate de respaldar datos importantes antes de proceder, ya que la instalación borrará el disco.
 
-### Pasos clave y recomendaciones
+### Paso 1: Prepara la USB Booteable
+Necesitas una USB de al menos 8GB con la imagen ISO de Ubuntu.
 
-1. **Accede a la BIOS/UEFI** (teclas comunes: F2, F8, F11, F12, DEL, BACKSPACE).
-2. **Configura la BIOS/UEFI:**
-  * Desactiva Secure Boot y TPM.
-  * (Opcional) Configura AC Power Loss en Always On para servidores.
-3. **Guarda y reinicia** (usualmente F10).
-4. **Bootea desde USB** y selecciona la imagen de Ubuntu.
-5. **Edita parámetros de arranque:**
-  * Agrega `nomodeset` después de `---` para evitar conflictos gráficos.
-  * Explicación: Esto previene problemas con GPUs nuevas no soportadas por drivers genéricos.
-6. **Instala Ubuntu:**
-  * Elige idioma, teclado, instalación normal y marca las opciones de software de terceros y multimedia.
-  * Configura usuario y zona horaria.
-  * **Advertencia:** "Borrar disco e instalar Ubuntu" elimina todos los datos.
-7. **Reinicia y retira la USB.**
+1. **Descarga la imagen ISO:**
+   - Ve a [https://ubuntu.com/download/desktop](https://ubuntu.com/download/desktop).
+   - Descarga Ubuntu 24.04.1 LTS (archivo ~4GB).
+   - **Verificación:** Calcula el hash SHA256 para confirmar integridad:
+     ```bash
+     wget https://releases.ubuntu.com/24.04.1/SHA256SUMS
+     sha256sum ubuntu-24.04.1-desktop-amd64.iso
+     ```
+     Compara con el valor en SHA256SUMS.
 
-> **Nota:** Si tienes dudas sobre alguna opción de BIOS, consulta el manual de tu placa madre.
+2. **Instala Ventoy (recomendado para facilidad):**
+   - Descarga Ventoy desde [https://www.ventoy.net/](https://www.ventoy.net/).
+   - Instala en tu USB actual (borrará datos):
+     ```bash
+     wget https://github.com/ventoy/Ventoy/releases/download/v1.0.99/Ventoy-1.0.99-linux.tar.gz
+     tar -xzf Ventoy-1.0.99-linux.tar.gz
+     cd Ventoy-1.0.99
+     sudo ./Ventoy2Disk.sh -i /dev/sdX  # Reemplaza /dev/sdX por tu USB (ej. /dev/sdb). ¡Cuidado, borra todo!
+     ```
+   - Copia la ISO descargada a la USB (Ventoy la detectará automáticamente).
+
+3. **Alternativa: Usa BalenaEtcher (si prefieres GUI):**
+   - Descarga desde [https://etcher.balena.io/](https://etcher.balena.io/).
+   - Instala: `sudo apt install balena-etcher-electron` (en un sistema Linux existente).
+   - Flashea la ISO a la USB.
+
+**Verificación:** Inserta la USB en otro PC y verifica que aparezca el menú de boot de Ubuntu.
+
+### Paso 2: Accede a la BIOS/UEFI
+Reinicia tu PC y entra al setup de BIOS/UEFI presionando la tecla correcta durante el POST (pantalla inicial). Teclas comunes:
+- F2, F8, F10, F11, F12, DEL, ESC, BACKSPACE.
+- Consulta el manual de tu placa madre (busca por modelo en Google).
+
+**Ejemplo:** En ASUS ROG, presiona DEL. En MSI, F2.
+
+### Paso 3: Configura la BIOS/UEFI
+Una vez dentro:
+1. **Desactiva Secure Boot:**
+   - Ve a "Security" o "Boot" > "Secure Boot" > Configúralo en "Disabled".
+   - **Por qué:** Evita conflictos con drivers NVIDIA propietarios.
+
+2. **Desactiva TPM (si está habilitado):**
+   - Busca "TPM" o "Trusted Platform Module" > "Disabled".
+   - **Por qué:** Puede interferir con instalaciones personalizadas.
+
+3. **Configura el orden de boot:**
+   - Ve a "Boot" > Asegúrate de que USB esté primero (arriba en la lista).
+
+4. **(Opcional para servidores) Configura AC Power Loss:**
+   - Ve a "Power" > "AC Power Loss" > "Always On".
+   - **Por qué:** Mantiene el PC encendido tras cortes de energía.
+
+5. **Guarda y sal:**
+   - Presiona F10 (o la tecla indicada) para guardar y reiniciar.
+
+**Verificación:** El PC debería reiniciar. Si no entraste, intenta de nuevo con otra tecla.
+
+### Paso 4: Bootea desde la USB
+- Inserta la USB preparada.
+- Reinicia y selecciona la USB en el menú de boot (si no aparece automáticamente).
+- Elige "Try or Install Ubuntu" en el menú de Ventoy/GRUB.
+
+### Paso 5: Edita Parámetros de Arranque (Opcional pero Recomendado)
+Si tienes una GPU NVIDIA nueva, agrega `nomodeset` para evitar pantallas negras.
+- En el menú de GRUB, presiona E para editar.
+- Busca la línea que comienza con `linux` y agrega `nomodeset` al final (después de `---` si hay).
+- Presiona F10 para bootear.
+
+**Ejemplo de línea editada:**
+```
+linux /boot/vmlinuz-... nomodeset ---
+```
+
+**Por qué:** Desactiva el modo gráfico genérico, previniendo conflictos con GPUs no soportadas.
+
+### Paso 6: Instala Ubuntu
+1. **Selecciona idioma:** Elige Español o English (recomendado para soporte).
+2. **Configura teclado:** Selecciona tu layout (ej. Spanish).
+3. **Conecta a internet:** Recomendado para actualizaciones durante instalación.
+4. **Tipo de instalación:** Elige "Instalación normal" (no minimal).
+5. **Opciones adicionales:** Marca "Instalar software de terceros" y "Instalar actualizaciones durante la instalación" para codecs multimedia y drivers.
+6. **Particionamiento:** Selecciona "Borrar disco e instalar Ubuntu" (elimina todo; usa particiones manuales si dual-boot).
+   - **Advertencia:** Esto borra TODOS los datos. Confirma.
+7. **Configura usuario:**
+   - Nombre, nombre de usuario, contraseña (usa una fuerte).
+   - Zona horaria: Selecciona automáticamente o manual.
+8. **Finaliza:** Espera a que termine (15-30 min). No retires la USB aún.
+
+**Verificación durante instalación:** Si hay errores, anótalos para troubleshooting.
+
+### Paso 7: Post-Instalación Inicial
+1. **Reinicia:** Quita la USB cuando aparezca el mensaje.
+2. **Primer boot:** Inicia sesión con tu usuario.
+3. **Verificaciones básicas:**
+   - Abre una terminal: `Ctrl+Alt+T`.
+   - Versión de Ubuntu: `lsb_release -a` (debería mostrar 24.04.1 LTS).
+   - Conexión a internet: `ping -c 4 google.com`.
+   - Espacio en disco: `df -h`.
+
+**Si hay problemas gráficos:** Si la pantalla se ve mal, ejecuta `sudo apt update && sudo apt install ubuntu-drivers-common` y reinicia.
+
+### Troubleshooting Común en Instalación
+- **USB no bootea:** Verifica que Ventoy esté instalado correctamente (`lsblk` para ver particiones). Prueba otra USB o herramienta.
+- **Pantalla negra en boot:** Agrega `nomodeset` o prueba `acpi=off` en parámetros de GRUB.
+- **Error de particionamiento:** Usa GParted desde live USB para preparar discos.
+- **Secure Boot no se desactiva:** Algunos PCs requieren contraseña de BIOS; busca en manual.
+- **Instalación se congela:** Reinicia y desactiva opciones de overclock en BIOS.
+- **Dual-boot con Windows:** Usa particiones manuales; instala Ubuntu después de Windows para GRUB.
+
+> **Nota:** Si tienes dudas sobre BIOS, busca "modelo placa madre BIOS setup" en Google. Para soporte avanzado, consulta foros de Ubuntu.
 
 ---
 
 ## 3. Preparación Inicial del Sistema Ubuntu
-* **Configuración de GDM3 (Opcional pero Recomendado para Instalación Gráfica):** Si vas a usar la interfaz gráfica, es recomendable deshabilitar Wayland para evitar problemas con drivers propietarios.
 
-  Edita el archivo de configuración:
+> **Nota:** Esta sección prepara Ubuntu para instalar drivers NVIDIA y CUDA. Ejecuta los comandos en orden. Asume que acabas de instalar Ubuntu 24.04.1 LTS.
+
+### Paso 1: Configura GDM3 para Desactivar Wayland (Opcional pero Recomendado)
+Wayland puede causar problemas con drivers NVIDIA propietarios. Desactívalo para usar Xorg.
+
+```bash
+sudo nano /etc/gdm3/custom.conf
+```
+
+- Busca la línea `#WaylandEnable=false`.
+- Elimina el `#` para descomentarla (quedará `WaylandEnable=false`).
+- Guarda: Ctrl+O, Enter, Ctrl+X.
+
+**Verificación:** Reinicia y ejecuta `echo $XDG_SESSION_TYPE` (debería mostrar `x11`, no `wayland`).
+
+**Por qué:** Xorg es más compatible con GPUs NVIDIA.
+
+### Paso 2: Actualiza el Sistema
+Actualiza paquetes para seguridad y compatibilidad.
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+**Verificación:**
+- `apt list --upgradable` (debería estar vacío si todo se actualizó).
+- Reinicia: `sudo reboot`.
+
+**Por qué:** Evita conflictos con versiones obsoletas.
+
+### Paso 3: Instala Dependencias Comunes
+Instala herramientas esenciales para desarrollo, gráficos, networking y calidad de vida (como monitoreo y troubleshooting).
+
+```bash
+sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors neofetch
+```
+
+**Verificación:**
+- `gcc --version` (debería mostrar versión instalada).
+- `glxinfo | grep "OpenGL"` (verifica OpenGL básico).
+- `traceroute google.com` (debería mostrar ruta de red).
+- `htop` (abre monitor de procesos; presiona q para salir).
+
+**Por qué:** Estos paquetes son necesarios para compilar drivers y herramientas CUDA/GPU. Las adicionales mejoran la experiencia: `htop` para monitoreo, `traceroute` para debugging de red, `vim` para edición, etc.
+
+### Paso 4: Configura el Firewall para SSH (Opcional)
+Habilita SSH y configura UFW para acceso remoto seguro (opcional, si no usas firewall, omite este paso).
+
+```bash
+sudo ufw allow ssh
+sudo ufw --force enable
+```
+
+**Verificación (opcional):**
+- `sudo ufw status` (debería mostrar SSH allowed y status active).
+- Prueba SSH desde otro dispositivo: `ssh usuario@ip_de_tu_pc`.
+
+**Por qué (opcional):** SSH es útil para administración remota; UFW protege el sistema. Si no lo habilitas, asegúrate de seguridad alternativa.
+
+### Paso 5: Preparación Específica por Versión de Ubuntu
+Dependiendo de tu versión, instala dependencias adicionales.
+
+* **Para Ubuntu 22.04 LTS:**
+  Instala GCC/G++ 12 (necesario para CUDA en versiones antiguas).
+
   ```bash
-  sudo nano /etc/gdm3/custom.conf
+  sudo apt update
+  sudo apt install -y gcc-12 g++-12
   ```
-  Busca la línea `#WaylandEnable=false` y **elimina el `#`** para descomentarla. Quedaría:
+
+  Registra como alternativas:
+  ```bash
+  sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 120
+  sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 120
+  sudo update-alternatives --config gcc  # Selecciona gcc-12 si pregunta
+  sudo update-alternatives --config g++
   ```
-  WaylandEnable=false
+
+  **Verificación:**
+  ```bash
+  gcc --version  # Debería mostrar gcc 12.x.x
+  g++ --version
   ```
-  Guarda (Ctrl+O, Enter) y cierra (Ctrl+X).
 
-
-### Antes de instalar drivers, prepara el sistema
-
-* **Actualiza el sistema**
+* **Para Ubuntu 24.04 LTS:**
+  Instala `libtinfo5` (para compatibilidad con herramientas antiguas).
 
   ```bash
-  sudo apt update && sudo apt upgrade -y
+  wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+  sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+  rm libtinfo5_6.3-2ubuntu0.1_amd64.deb
   ```
 
-* **Reinicia para aplicar actualizaciones**
-
+  **Verificación:**
   ```bash
-  sudo reboot
+  dpkg -l | grep libtinfo5  # Debería mostrar instalado
   ```
 
-* **Instala dependencias comunes**
+**Por qué:** Diferentes versiones de Ubuntu tienen dependencias específicas para NVIDIA/CUDA.
 
-  ```bash
-  sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget
-  ```
-
-* **Configura GDM3 (opcional):** Desactiva Wayland para evitar problemas con drivers propietarios.
-
-* **Configura el firewall para SSH**
-
-  ```bash
-  sudo ufw allow ssh
-  sudo ufw --force enable
-  ```
-
-* **Preparación específica por versión de Ubuntu**
-  * **Ubuntu 22.04:** Instala y configura GCC/G++ 12.
-  
-  GCC/G++ 12 (Ubuntu 22.04)
-  - Instala los compiladores:
-    ```bash
-    sudo apt update
-    sudo apt install -y gcc-12 g++-12
-    ```
-  - Registra GCC/G++ 12 como alternativas y establécelos como predeterminados:
-    ```bash
-    # Registrar las alternativas (prioridad 120)
-    sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 120
-    sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 120
-
-    # Selección manual en caso de múltiples versiones instaladas
-    sudo update-alternatives --config gcc
-    sudo update-alternatives --config g++
-    ```
-  - Verifica:
-    ```bash
-    gcc --version
-    g++ --version
-    ```
-  - (Opcional) Asegura que cc/c++ apunten a gcc/g++:
-    ```bash
-    sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc 120
-    sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++ 120
-    ```
-  * **Ubuntu 24.04:** Instala la dependencia `libtinfo5` (necesaria para algunos drivers/herramientas antiguas). Puedes descargar el paquete directamente desde el repositorio oficial:
-
-    [Descargar libtinfo5 para Ubuntu 24.04 (noble)](http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb)
-
-    ```bash
-    wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-    sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
-    rm libtinfo5_6.3-2ubuntu0.1_amd64.deb # Limpia el archivo descargado
-    ```
+### Troubleshooting Común en Preparación
+- **Error en apt update:** Verifica conexión: `ping -c 4 archive.ubuntu.com`. Si falla, cambia mirrors en `/etc/apt/sources.list`.
+- **GCC no se instala:** Ejecuta `sudo apt --fix-broken install` si hay dependencias rotas.
+- **Wayland no se desactiva:** Edita `/etc/gdm3/custom.conf` manualmente y reinicia.
+- **Firewall bloquea conexiones:** `sudo ufw disable` temporalmente para pruebas.
+- **Paquetes faltan:** `sudo apt search <paquete>` para verificar nombres exactos.
 
 > **Advertencia:** Verifica compatibilidad de drivers y CUDA antes de instalar. Los comandos con `sudo` pueden alterar el sistema.
 
 ---
 
 ## 4. Instalación de Drivers de NVIDIA en Ubuntu
-* **Preparación para Instalación:**
-  Asegúrate de que no esté corriendo el entorno gráfico (GDM) o cámbiate al modo texto:
-  ```bash
-  sudo systemctl set-default multi-user.target
-  sudo reboot
-  ```
-  Da permisos de ejecución al archivo `.run`:
-  ```bash
-  sudo chmod +x NVIDIA-Linux-x86_64-XXX.XX.run # Reemplaza XXX.XX por el número de versión descargado
-  ```
-* **Instalación del Driver:**
-  Ejecuta el instalador con `sudo` y el flag `--dkms` para facilitar actualizaciones de kernel:
-  ```bash
-  sudo ./NVIDIA-Linux-x86_64-XXX.XX.run --dkms
-  ```
-  El instalador te hará preguntas:
-  - `The distribution-provided pre-install script failed! Are you sure you want to continue?` -> `Continue Installation`
-  - `Would you like to register the kernel module sou...` -> `Yes` (si usaste `--dkms`)
-  - `Install NVIDIA's 32-bit compatibility libraries?` -> `Yes`
-  - `Would you like to run nvidia-xconfig?` -> `No` (a menos que tengas una configuración X11 específica)
-  - `Would you like to enable nvidia-apply-extra-quirks?` -> `Yes` (si está disponible)
 
+> **Nota:** Esta sección asume Ubuntu 22.04 o 24.04 LTS. Asegúrate de tener acceso root (sudo). Si usas una versión diferente, verifica compatibilidad en el Anexo B.
 
-### ¿Cómo instalar correctamente los drivers?
+### Paso 1: Identifica tu GPU NVIDIA
+Antes de instalar, confirma el modelo exacto de tu GPU para descargar el driver correcto.
 
-* **Identifica tu GPU**
+```bash
+lspci | grep -i nvidia
+```
 
-  ```bash
-  lspci | grep -i nvidia
-  ```
+**Ejemplo de salida esperada:**
+```
+01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3070] (rev a1)
+```
 
-* **Verifica compatibilidad** Consulta la tabla de GPUs y el Anexo B.
+- Si no ves salida, tu GPU no es NVIDIA o no está detectada (revisa BIOS/UEFI).
+- Anota el modelo (ej. RTX 3070) para el siguiente paso.
 
-* **Elimina drivers antiguos**
+### Paso 2: Verifica Compatibilidad
+- Consulta el Anexo B para confirmar que tu GPU es compatible con drivers recientes.
+- Visita [https://www.nvidia.com/drivers/](https://www.nvidia.com/drivers/) e ingresa tu modelo para ver drivers disponibles.
+- **Recomendación:** Usa drivers de la serie 550.x o superior para Ubuntu 24.04 (ej. 550.54.15 para compatibilidad con CUDA 12.8).
 
-  ```bash
-  sudo apt-get purge '^nvidia-.*'
-  sudo apt-get purge nvidia-* --autoremove -y
-  sudo apt-get autoremove -y
-  sudo reboot
-  ```
+### Paso 3: Elimina Drivers Antiguos (Obligatorio)
+Si has instalado drivers previamente (incluso desde repositorios), elimínalos para evitar conflictos.
 
-* **Descarga el driver oficial** desde la web de NVIDIA:
+```bash
+sudo apt-get purge '^nvidia-.*' -y
+sudo apt-get purge nvidia-* --autoremove -y
+sudo apt-get autoremove -y
+sudo reboot
+```
 
-  [Página oficial de drivers NVIDIA](https://www.nvidia.com/drivers/)
+**Verificación:** Después del reinicio, ejecuta `lspci | grep -i nvidia` nuevamente. No deberías ver drivers cargados (puedes ignorar la línea de hardware).
 
-  Selecciona tu GPU, sistema operativo y versión. Descarga el archivo `.run` manualmente desde la web, o copia el enlace directo y descárgalo por terminal con `wget`:
+### Paso 4: Descarga el Driver Oficial
+- Ve a [https://www.nvidia.com/drivers/](https://www.nvidia.com/drivers/).
+- Selecciona: Product Type: GeForce/Quadro/Tesla, Product Series: Tu serie (ej. GeForce RTX 30 Series), Product: Tu modelo, Operating System: Linux 64-bit, Language: English.
+- Descarga el archivo `.run` (ej. NVIDIA-Linux-x86_64-550.54.15.run).
 
-  ```bash
-  wget https://us.download.nvidia.com/XFree86/Linux-x86_64/XXX.XX/NVIDIA-Linux-x86_64-XXX.XX.run
-  # Reemplaza XXX.XX por la versión que corresponda a tu GPU y sistema
-  ```
+**Descarga por terminal (ejemplo para RTX 30/40 Series en Ubuntu 24.04):**
+```bash
+wget https://us.download.nvidia.com/XFree86/Linux-x86_64/550.54/NVIDIA-Linux-x86_64-550.54.15.run
+```
 
-* **Prepara la instalación**
-  * Cambia a modo texto si es necesario.
-  * Da permisos de ejecución al archivo `.run`.
+- Si el enlace cambia, busca el exacto en la web de NVIDIA.
+- **Verificación:** Lista el archivo descargado: `ls -la NVIDIA-Linux-x86_64-*.run`
 
-* **Instala el driver**
-  * Usa el flag `--dkms` para facilitar actualizaciones de kernel.
-  * Responde a las preguntas del instalador según las recomendaciones.
+### Paso 5: Prepara la Instalación
+Cambia al modo texto para evitar conflictos gráficos (recomendado, especialmente en servidores).
 
-* **Verifica la instalación**
+```bash
+sudo systemctl set-default multi-user.target
+sudo reboot
+```
 
-  ```bash
-  nvidia-smi
-  ```
-  * Si ves información de tu GPU, ¡todo está correcto!
+Después del reinicio, inicia sesión en modo texto y da permisos de ejecución al archivo:
 
-> **Tip:** Si tienes problemas con el entorno gráfico, revisa la sección de gestión de la interfaz gráfica.
+```bash
+sudo chmod +x NVIDIA-Linux-x86_64-550.54.15.run
+```
+
+**Verificación:** Confirma permisos: `ls -la NVIDIA-Linux-x86_64-550.54.15.run` (debería mostrar -rwxr-xr-x).
+
+### Paso 6: Instala el Driver
+Ejecuta el instalador con flags para compatibilidad y actualizaciones futuras.
+
+```bash
+sudo ./NVIDIA-Linux-x86_64-550.54.15.run --dkms --no-opengl-files --no-man-page --no-install-compat32-libs
+```
+
+**Respuestas a las preguntas del instalador (presiona Enter para aceptar defaults, o responde como se indica):**
+- `The distribution-provided pre-install script failed! Are you sure you want to continue?` → `Yes` (continúa, es común en Ubuntu).
+- `Would you like to register the kernel module sources with DKMS?` → `Yes` (facilita actualizaciones de kernel).
+- `Install NVIDIA's 32-bit compatibility libraries?` → `No` (a menos que uses aplicaciones 32-bit).
+- `Would you like to run nvidia-xconfig?` → `No` (configuraremos manualmente si es necesario).
+- `Would you like to enable nvidia-apply-extra-quirks?` → `Yes` (mejora estabilidad).
+
+La instalación tomará unos minutos. Si falla, revisa logs en `/var/log/nvidia-installer.log`.
+
+**Verificación post-instalación:**
+```bash
+nvidia-smi
+```
+
+**Ejemplo de salida esperada:**
+```
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 550.54.15    Driver Version: 550.54.15    CUDA Version: 12.4     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================+
+|   0  NVIDIA GeForce ...       Off                  | 00000000:01:00.0 Off |
+...
++-----------------------------------------------------------------------------+
+```
+
+- Si ves "NVIDIA-SMI has failed" o no hay salida, el driver no se instaló correctamente.
+
+### Paso 7: Reactiva el Entorno Gráfico (si lo desactivaste)
+Si instalaste en modo texto, vuelve al modo gráfico:
+
+```bash
+sudo systemctl set-default graphical.target
+sudo reboot
+```
+
+**Verificación final:** Después del reinicio, abre una terminal y ejecuta `nvidia-smi`. Deberías ver la info de tu GPU.
+
+### Método Alternativo: Instalación desde Repositorios APT (Más Fácil pero Menos Óptimo)
+Si prefieres un método más simple sin descargar .run, usa los repositorios de Ubuntu. Este instala drivers desde paquetes APT, pero puede ser menos actualizado que el .run oficial.
+
+#### Paso 1: Actualiza y Agrega PPA (Opcional para Versiones Más Nuevas)
+Para drivers más recientes, agrega el PPA de graphics-drivers:
+```bash
+sudo add-apt-repository ppa:graphics-drivers/ppa -y
+sudo apt update
+```
+
+#### Paso 2: Instala el Driver
+Busca versiones disponibles:
+```bash
+ubuntu-drivers list
+```
+
+Instala la recomendada (ej. nvidia-driver-550):
+```bash
+sudo apt install -y nvidia-driver-550
+```
+
+**Verificación:**
+```bash
+nvidia-smi
+# Debería mostrar info de GPU
+```
+
+#### Paso 3: Reinicia
+```bash
+sudo reboot
+```
+
+**Ventajas:** Fácil, actualizable con apt. **Desventajas:** Versiones pueden ser más viejas; no tan optimizado como .run oficial.
+
+### Troubleshooting Común para Drivers NVIDIA
+- **Error: "The distribution-provided pre-install script failed"**: Ignóralo y continúa; es un warning no crítico.
+- **Pantalla negra después del reinicio**: Reinicia en modo recovery (desde GRUB, selecciona "Advanced options" > recovery mode) y ejecuta `sudo apt-get purge nvidia-*` para desinstalar.
+- **Driver no detectado**: Verifica que Secure Boot esté desactivado en BIOS/UEFI. Ejecuta `dmesg | grep nvidia` para logs de error.
+- **Problemas con kernel nuevo**: Si actualizas el kernel, ejecuta `sudo dkms autoinstall` para recompilar módulos.
+- **Si nada funciona**: Prueba drivers desde repositorios oficiales: `sudo apt install nvidia-driver-550` (pero menos óptimo que .run).
+
+> **Tip:** Si tienes problemas con el entorno gráfico, revisa la sección 8 sobre gestión de la interfaz gráfica.
 
 ---
 
 ## 5. Instalación de CUDA Toolkit
 
-### Instala CUDA de forma segura y compatible
+> **Nota:** CUDA Toolkit es esencial para desarrollo GPU. Asume drivers NVIDIA instalados (sección 4). **Antes de instalar, verifica la versión más moderna compatible con tu GPU y sistema en [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads). La versión 12.8 mostrada aquí es un ejemplo; usa la más reciente disponible para tu hardware (ej. 12.9 si sale).** Consulta el Anexo B para compatibilidad.
 
-> **Importante:** Verifica compatibilidad en el Anexo B antes de instalar. Asegúrate de que tu GPU y driver NVIDIA sean compatibles con la versión de CUDA deseada.
+### Método 1: Instalación mediante Repositorio APT (Recomendado)
 
-Existen dos métodos principales para instalar CUDA Toolkit: mediante repositorio APT (recomendado para facilidad de actualización) o instalación manual con el archivo `.run` (mayor control).
+#### Paso 1: Agrega el Repositorio de NVIDIA
+Descarga e instala la clave para Ubuntu 24.04:
 
----
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+```
 
-#### **Método 1: Instalación mediante Repositorio APT (Recomendado)**
+**Verificación:** `apt search cuda` debería mostrar paquetes disponibles.
 
-Este método facilita las actualizaciones y gestión de paquetes.
+#### Paso 2: Instala CUDA Toolkit
+Para la última versión:
+```bash
+sudo apt-get install -y cuda-toolkit
+```
 
-1. **Descarga e instala la clave del repositorio:**
+Para versión específica (ej. 12.8):
+```bash
+sudo apt-get install -y cuda-toolkit-12-8
+```
 
-   Para Ubuntu 24.04:
-   ```bash
-   wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
-   sudo dpkg -i cuda-keyring_1.1-1_all.deb
-   sudo apt-get update
-   ```
+**Verificación:** `nvcc --version` (debería mostrar CUDA 12.8).
 
-   Para Ubuntu 22.04:
-   ```bash
-   wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
-   sudo dpkg -i cuda-keyring_1.1-1_all.deb
-   sudo apt-get update
-   ```
+#### Paso 3: Configura Variables de Entorno
+Edita `.bashrc`:
+```bash
+nano ~/.bashrc
+```
 
-2. **Instala CUDA Toolkit:**
+Agrega al final:
+```bash
+export PATH=/usr/local/cuda-12.8/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+```
 
-   Para instalar la última versión disponible:
-   ```bash
-   sudo apt-get install -y cuda-toolkit
-   ```
+Guarda y recarga:
+```bash
+source ~/.bashrc
+```
 
-   Para instalar una versión específica (ejemplo: CUDA 12.8):
-   ```bash
-   sudo apt-get install -y cuda-toolkit-12-8
-   ```
+**Verificación:** `which nvcc` (debería mostrar /usr/local/cuda-12.8/bin/nvcc).
 
-3. **Configura variables de entorno:**
+### Método 2: Instalación Manual con Archivo .run
 
-   Edita tu archivo `.bashrc`:
-   ```bash
-   nano ~/.bashrc
-   ```
+#### Paso 1: Descarga el Instalador
+Ve a [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads), selecciona Linux/x86_64/Ubuntu/24.04/runfile.
 
-   Agrega estas líneas al final (ajusta la versión según lo instalado):
-   ```bash
-   export PATH=/usr/local/cuda-12.8/bin${PATH:+:${PATH}}
-   export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-   ```
+Descarga:
+```bash
+wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_550.54.15_linux.run
+```
 
-   Guarda (Ctrl+O, Enter) y cierra (Ctrl+X).
+**Verificación:** `ls -la cuda_*.run`
 
-   Recarga el archivo `.bashrc`:
-   ```bash
-   source ~/.bashrc
-   ```
+#### Paso 2: Prepara el Sistema
+Cambia a modo texto:
+```bash
+sudo systemctl set-default multi-user.target
+sudo reboot
+```
 
-4. **Verifica la instalación:**
+Da permisos:
+```bash
+chmod +x cuda_12.8.0_550.54.15_linux.run
+```
 
-   ```bash
-   nvcc --version
-   ```
+#### Paso 3: Ejecuta el Instalador
+```bash
+sudo sh cuda_12.8.0_550.54.15_linux.run
+```
 
-   Deberías ver información sobre la versión de CUDA instalada.
+Respuestas:
+- Acepta EULA.
+- NO instales driver (ya tienes uno).
+- Selecciona: CUDA Toolkit (sí), Samples (opcional), Documentation (opcional).
 
----
+#### Paso 4: Configura Variables de Entorno
+Igual que en Método 1.
 
-#### **Método 2: Instalación Manual con archivo .run**
+#### Paso 5: Verifica y Reactiva Gráfico
+```bash
+nvcc --version
+nvidia-smi
+sudo systemctl set-default graphical.target
+sudo reboot
+```
 
-Este método ofrece mayor control sobre qué componentes instalar.
+### Instalación de cuDNN (Opcional - Para Deep Learning)
 
-1. **Descarga el instalador desde la web oficial:**
+cuDNN acelera redes neuronales en CUDA. Instálalo después de CUDA.
 
-   Visita [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads) y selecciona:
-   - Sistema operativo: Linux
-   - Arquitectura: x86_64
-   - Distribución: Ubuntu
-   - Versión: 22.04 o 24.04
-   - Installer Type: **runfile (local)**
+#### Paso 1: Descarga cuDNN
+Ve a [https://developer.nvidia.com/cudnn](https://developer.nvidia.com/cudnn), descarga para CUDA 12.x (ej. cuDNN 9.3 para CUDA 12.8).
 
-   Descarga con `wget` (ejemplo para CUDA 12.8):
-   ```bash
-   wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_550.54.15_linux.run
-   ```
+Para Ubuntu: Descarga .deb local (ej. cudnn-local-repo-ubuntu2404-9.3.0_1.0-1_amd64.deb).
 
-2. **Prepara el sistema:**
+```bash
+wget https://developer.download.nvidia.com/compute/cudnn/9.3.0/local_installers/cudnn-local-repo-ubuntu2404-9.3.0_1.0-1_amd64.deb
+```
 
-   Cambia a modo texto (opcional pero recomendado):
-   ```bash
-   sudo systemctl set-default multi-user.target
-   sudo reboot
-   ```
+#### Paso 2: Instala cuDNN
+```bash
+sudo dpkg -i cudnn-local-repo-ubuntu2404-9.3.0_1.0-1_amd64.deb
+sudo cp /var/cudnn-local-repo-ubuntu2404-9.3.0/cudnn-local-*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get install -y cudnn9-cuda-12-8
+```
 
-   Da permisos de ejecución:
-   ```bash
-   chmod +x cuda_12.8.0_550.54.15_linux.run
-   ```
+**Verificación:**
+```bash
+dpkg -l | grep cudnn
+# Debería mostrar cudnn9-cuda-12-8 instalado
+```
 
-3. **Ejecuta el instalador:**
+#### Paso 3: Verifica Integración con CUDA
+Compila un sample:
+```bash
+cd /usr/local/cuda-12.8/samples/1_Utilities/deviceQuery
+make
+./deviceQuery
+```
 
-   ```bash
-   sudo sh cuda_12.8.0_550.54.15_linux.run
-   ```
+Debería mostrar info de GPU y CUDA.
 
-   **Durante la instalación:**
-   - Acepta el EULA (End User License Agreement)
-   - **NO instales el driver si ya tienes uno instalado** (desmarca esa opción)
-   - Selecciona los componentes que deseas instalar:
-     - CUDA Toolkit (obligatorio)
-     - CUDA Samples (opcional)
-     - CUDA Documentation (opcional)
-
-4. **Configura variables de entorno:**
-
-   Edita tu archivo `.bashrc`:
-   ```bash
-   nano ~/.bashrc
-   ```
-
-   Agrega estas líneas al final:
-   ```bash
-   export PATH=/usr/local/cuda-12.8/bin${PATH:+:${PATH}}
-   export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-   ```
-
-   Guarda (Ctrl+O, Enter) y cierra (Ctrl+X).
-
-   Recarga el archivo `.bashrc`:
-   ```bash
-   source ~/.bashrc
-   ```
-
-5. **Verifica la instalación:**
-
-   ```bash
-   nvcc --version
-   nvidia-smi
-   ```
-
-6. **Reactiva el entorno gráfico (si lo desactivaste):**
-
-   ```bash
-   sudo systemctl set-default graphical.target
-   sudo reboot
-   ```
-
----
-
-### ¿Qué método elegir?
+### ¿Qué Método Elegir?
 
 | Característica | Repositorio APT | Instalador .run |
 |----------------|-----------------|-----------------|
-| **Facilidad de instalación** | ⭐⭐⭐⭐⭐ Muy fácil | ⭐⭐⭐ Moderado |
-| **Actualizaciones** | ⭐⭐⭐⭐⭐ Automáticas con `apt` | ⭐⭐ Manual |
-| **Control de componentes** | ⭐⭐⭐ Limitado | ⭐⭐⭐⭐⭐ Total |
-| **Múltiples versiones** | ⭐⭐⭐ Posible pero complejo | ⭐⭐⭐⭐⭐ Fácil |
-| **Recomendado para** | Usuarios generales | Desarrolladores avanzados |
+| **Facilidad** | ⭐⭐⭐⭐⭐ Fácil | ⭐⭐⭐ Moderado |
+| **Actualizaciones** | ⭐⭐⭐⭐⭐ Automáticas | ⭐⭐ Manual |
+| **Control** | ⭐⭐⭐ Limitado | ⭐⭐⭐⭐⭐ Total |
+| **Recomendado para** | Usuarios generales | Desarrolladores |
 
-> **Recomendación:** Para la mayoría de usuarios, el método de repositorio APT es más conveniente y facilita el mantenimiento del sistema.
+> **Recomendación:** APT para simplicidad. Instala cuDNN después.
 
-> **Advertencia:** Instalar CUDA puede requerir reiniciar el sistema. Si encuentras conflictos con drivers, revisa la sección 4 sobre drivers NVIDIA.
+### Troubleshooting para CUDA/cuDNN
+- **nvcc no encontrado:** Verifica PATH en `.bashrc`.
+- **Errores de compilación:** Asegura GCC compatible (ver sección 3).
+- **cuDNN no instala:** Verifica versión compatible con CUDA.
+- **GPU no detectada:** `nvidia-smi` para check.
 
-> **Nota:** Para Ubuntu 24.04, CUDA 12.8 o superior es recomendado. Consulta siempre la compatibilidad en el Anexo B.
+> **Advertencia:** Reinicio puede ser necesario. Si conflictos, revisa sección 4.
 
 ---
 
 ## 6. Configuración Específica para Estaciones de Compresión
-* **Instalación de MongoDB:**
-  Importe la clave GPG oficial:
-  ```bash
-  curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
-  ```
-  Agrega el repositorio de MongoDB (ajusta `jammy` por `noble` si usas Ubuntu 24.04):
-  ```bash
-  echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-  ```
-  Actualiza e instala MongoDB:
-  ```bash
-  sudo apt-get update
-  sudo apt-get install -y mongodb-org
-  ```
-  Inicia y habilita el servicio:
-  ```bash
-  sudo systemctl start mongod
-  sudo systemctl enable mongod
-  ```
-  (Opcional) Verifica el estado:
-  ```bash
-  sudo systemctl status mongod
-  ```
 
+> **Nota:** Esta sección instala herramientas para estaciones de compresión/data, asumiendo Ubuntu 24.04.1 LTS con CUDA/drivers instalados. Las herramientas son opcionales; instala solo lo necesario. Verifica versiones en sitios oficiales.
 
-Instalación de MongoDB Compass (GUI) – Método .deb (principal)
-- Descarga el instalador .deb desde la página oficial:
-  https://www.mongodb.com/try/download/compass
-- Si tienes el enlace directo a la versión concreta, puedes descargar con wget (reemplaza <VERSION>):
-  ```bash
-  wget https://downloads.mongodb.com/compass/mongodb-compass_<VERSION>_amd64.deb
-  # Ejemplo (hipotético):
-  # wget https://downloads.mongodb.com/compass/mongodb-compass_1.43.4_amd64.deb
-  ```
-- Instala el paquete:
-  ```bash
-  sudo apt install -y ./mongodb-compass_<VERSION>_amd64.deb
-  ```
-- Si aparecen dependencias faltantes:
-  ```bash
-  sudo apt --fix-broken install
-  ```
-  Luego reintenta la instalación del .deb si fue necesario.
-- Ejecuta Compass:
-  ```bash
-  mongodb-compass &
-  ```
-- Verificación rápida:
-  - Abre Compass y comprueba que aparece la pantalla de conexión.
-  - Conéctate a tu instancia local si instalaste MongoDB server:
-    - URI: mongodb://localhost:27017
-- Desinstalación (opcional):
-  ```bash
-  sudo apt remove -y mongodb-compass
-  ```
+### Instalación de MongoDB (Base de Datos NoSQL)
 
+#### Paso 1: Agrega el Repositorio
+Importa la clave GPG:
+```bash
+curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg
+```
 
-### Herramientas recomendadas para compresión/data
+Agrega el repositorio (ajusta `jammy` por `noble` si usas Ubuntu 24.04):
+```bash
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+```
 
-A continuación se listan las instalaciones de herramientas adicionales para estaciones de compresión/data.
+#### Paso 2: Instala MongoDB
+```bash
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+```
 
-* **Instalación de EMQX:**
-  
-  Agrega el repositorio e instala:
-  ```bash
-  curl -sL https://assets.emqx.com/scripts/install-emqx-deb.sh | sudo bash
-  sudo apt-get install emqx
-  ```
-  
-  Inicia y habilita el servicio:
-  ```bash
-  sudo systemctl start emqx
-  sudo systemctl enable emqx
-  ```
-  
-  (Opcional) Verifica el estado:
-  ```bash
-  sudo systemctl status emqx
-  ```
+#### Paso 3: Inicia y Habilita el Servicio
+```bash
+sudo systemctl start mongod
+sudo systemctl enable mongod
+```
 
-* **Instalación de Golang (Snap):**
-  
-  ```bash
-  sudo snap install go --classic
-  ```
+**Verificación:**
+```bash
+sudo systemctl status mongod
+mongosh --eval "db.runCommand('ping')"
+# Debería mostrar "ok": 1
+```
 
-* **Instalación de Visual Studio Code (Snap):**
-  
-  ```bash
-  sudo snap install code --classic
-  ```
+### Instalación de MongoDB Compass (GUI para MongoDB)
 
-* **Instalación de GStreamer y Plugins:**
-  
-  Instala los plugins necesarios:
-  ```bash
-  sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio gstreamer1.0-rtsp
-  ```
-  
-  Verifica la instalación de plugins específicos:
-  ```bash
-  gst-inspect-1.0 rtspclientsink
-  gst-inspect-1.0 nvh264enc
-  ```
+#### Paso 1: Descarga e Instala
+Descarga desde [https://www.mongodb.com/try/download/compass](https://www.mongodb.com/try/download/compass):
+```bash
+wget https://downloads.mongodb.com/compass/mongodb-compass_1.43.4_amd64.deb
+sudo apt install -y ./mongodb-compass_1.43.4_amd64.deb
+```
 
-* **Instalación de Angry IP Scanner:**
-  
-  Descarga el paquete `.deb` desde [Angry IP Scanner Releases](https://github.com/angryip/ipscan/releases) e instálalo:
-  ```bash
-  sudo apt install ./ipscan_<version>_amd64.deb
-  # Reemplaza <version> por el archivo descargado
-  ```
+Si dependencias faltan:
+```bash
+sudo apt --fix-broken install
+```
 
-* **Instalación de Anydesk para soporte remoto:**
-  
-  Agrega el repositorio oficial e instala:
-  ```bash
-  sudo apt update
-  sudo apt install ca-certificates curl apt-transport-https
-  sudo install -m 0755 -d /etc/apt/keyrings
-  sudo curl -fsSL https://keys.anydesk.com/repos/DEB-GPG-KEY -o /etc/apt/keyrings/keys.anydesk.com.asc
-  sudo chmod a+r /etc/apt/keyrings/keys.anydesk.com.asc
-  echo "deb [signed-by=/etc/apt/keyrings/keys.anydesk.com.asc] https://deb.anydesk.com all main" | sudo tee /etc/apt/sources.list.d/anydesk-stable.list > /dev/null
-  sudo apt update
-  sudo apt install anydesk
-  ```
-  
-  Habilita los puertos necesarios en el firewall UFW:
-  ```bash
-  # Reglas recomendadas para AnyDesk:
-  # TCP 80, 443 y 6568 son usados para señalización/conexión
-  # UDP 50001-50003 se usa para Discovery y optimización de conexión en LAN
-  sudo ufw allow 80/tcp
-  sudo ufw allow 443/tcp
-  sudo ufw allow 6568/tcp
-  sudo ufw allow 50001:50003/udp
-  ```
-  
-  > **Importante:** Toma nota del ID de Anydesk y configura una contraseña única.
+#### Paso 2: Ejecuta Compass
+```bash
+mongodb-compass &
+```
 
-* **Instalación de Rustdesk para soporte remoto:**
-  
-  Descarga el paquete `.deb` desde [Rustdesk Releases](https://github.com/rustdesk/rustdesk/releases) (versión x86-64 para Ubuntu) e instálalo:
-  ```bash
-  sudo apt install ./<paquete.deb>
-  # Reemplaza <paquete.deb> por el nombre del archivo descargado
-  ```
-  
-  > **Importante:** Toma nota del ID de Rustdesk, configura una contraseña única y marca la casilla que permite conexión con IP directa.
+**Verificación:** Abre la app y conecta a `mongodb://localhost:27017`.
 
-* **Tips:**
-  * Verifica el estado de los servicios tras la instalación.
-  * Configura contraseñas únicas para acceso remoto.
-  * Revisa la instalación de plugins específicos con `gst-inspect-1.0`.
+**Desinstalación (opcional):**
+```bash
+sudo apt remove -y mongodb-compass
+```
+
+### Instalación de EMQX (Broker MQTT)
+
+#### Paso 1: Instala desde Repositorio
+```bash
+curl -sL https://assets.emqx.com/scripts/install-emqx-deb.sh | sudo bash
+sudo apt-get install -y emqx
+```
+
+#### Paso 2: Inicia y Habilita
+```bash
+sudo systemctl start emqx
+sudo systemctl enable emqx
+```
+
+**Verificación:**
+```bash
+sudo systemctl status emqx
+# Dashboard en http://localhost:18083 (usuario: admin, pass: public)
+```
+
+### Instalación de Golang
+
+#### Paso 1: Instala con Snap
+```bash
+sudo snap install go --classic
+```
+
+**Verificación:**
+```bash
+go version
+# Debería mostrar versión instalada
+```
+
+### Instalación de Visual Studio Code
+
+#### Paso 1: Instala con Snap
+```bash
+sudo snap install code --classic
+```
+
+**Verificación:**
+```bash
+code --version
+# Debería mostrar versión
+```
+
+### Instalación de GStreamer y Plugins
+
+#### Paso 1: Instala Plugins
+```bash
+sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio gstreamer1.0-rtsp
+```
+
+**Verificación:**
+```bash
+gst-inspect-1.0 rtspclientsink
+gst-inspect-1.0 nvh264enc
+# Debería mostrar info del plugin
+```
+
+### Instalación de Angry IP Scanner
+
+#### Paso 1: Descarga e Instala
+Descarga desde [https://github.com/angryip/ipscan/releases](https://github.com/angryip/ipscan/releases):
+```bash
+wget https://github.com/angryip/ipscan/releases/download/3.9.1/ipscan_3.9.1_amd64.deb
+sudo apt install -y ./ipscan_3.9.1_amd64.deb
+```
+
+**Verificación:** Ejecuta `ipscan` desde terminal o menú.
+
+### Instalación de AnyDesk (Soporte Remoto)
+
+#### Paso 1: Agrega Repositorio e Instala
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl apt-transport-https
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://keys.anydesk.com/repos/DEB-GPG-KEY -o /etc/apt/keyrings/keys.anydesk.com.asc
+sudo chmod a+r /etc/apt/keyrings/keys.anydesk.com.asc
+echo "deb [signed-by=/etc/apt/keyrings/keys.anydesk.com.asc] https://deb.anydesk.com all main" | sudo tee /etc/apt/sources.list.d/anydesk-stable.list > /dev/null
+sudo apt update
+sudo apt install -y anydesk
+```
+
+#### Paso 2: Configura Firewall
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 6568/tcp
+sudo ufw allow 50001:50003/udp
+```
+
+**Verificación:** Ejecuta `anydesk` y anota el ID.
+
+### Instalación de RustDesk (Soporte Remoto Alternativo)
+
+#### Paso 1: Descarga e Instala
+Descarga desde [https://github.com/rustdesk/rustdesk/releases](https://github.com/rustdesk/rustdesk/releases):
+```bash
+wget https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3-x86_64.deb
+sudo apt install -y ./rustdesk-1.2.3-x86_64.deb
+```
+
+**Verificación:** Ejecuta `rustdesk` y configura ID/contraseña.
+
+### Configuración de Puertos para Estaciones de Compresión (Opcional)
+Si habilitaste UFW en la sección 3, abre los puertos necesarios para que las aplicaciones funcionen correctamente. Si no usas firewall, omite esta sección.
+
+| Aplicación | Puertos | Protocolo | Comando para Abrir (Opcional) |
+|------------|---------|-----------|-------------------------------|
+| MongoDB | 27017 | TCP | `sudo ufw allow 27017/tcp` |
+| EMQX MQTT | 1883 | TCP | `sudo ufw allow 1883/tcp` |
+| EMQX Dashboard | 18083 | TCP | `sudo ufw allow 18083/tcp` |
+| GStreamer RTSP | 554 | TCP/UDP | `sudo ufw allow 554/tcp && sudo ufw allow 554/udp` |
+| AnyDesk | 80, 443, 6568 | TCP | `sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw allow 6568/tcp` |
+| AnyDesk (UDP) | 50001-50003 | UDP | `sudo ufw allow 50001:50003/udp` |
+| RustDesk | Dinámicos (ver logs) | TCP/UDP | Configura según necesidad |
+| SSH (si usas) | 22 (o custom) | TCP | `sudo ufw allow ssh` |
+
+**Verificación general (opcional):**
+```bash
+sudo ufw status
+netstat -tlnp | grep LISTEN  # Lista puertos abiertos
+```
+
+**Tips (opcional):**
+- Para acceso remoto, abre solo puertos necesarios y desde IPs específicas: `sudo ufw allow from <IP> to any port 27017`.
+- Si usas VPN, ajusta reglas.
+- Revisa logs de apps para puertos adicionales (ej. `sudo journalctl -u emqx`).
+
+### Tips Generales
+- Verifica servicios: `sudo systemctl status <servicio>`.
+- Configura contraseñas únicas para acceso remoto.
+- Revisa plugins: Usa `gst-inspect-1.0` para GStreamer.
+
+### Troubleshooting
+- **MongoDB no inicia:** Revisa logs: `sudo journalctl -u mongod`.
+- **EMQX falla:** Verifica puertos: `netstat -tlnp | grep 1883`.
+- **GStreamer plugins faltan:** `sudo apt install gstreamer1.0-plugins-*`.
+- **AnyDesk/RustDesk no conecta:** Desactiva firewall temporalmente para test.
 
 > **Recursos Adicionales:**
-> * [Documentación oficial de MongoDB](https://www.mongodb.com/docs/)
-> * [Documentación oficial de EMQX](https://www.emqx.io/docs/)
-> * [Documentación oficial de GStreamer](https://gstreamer.freedesktop.org/documentation/)
+> * [MongoDB Docs](https://www.mongodb.com/docs/)
+> * [EMQX Docs](https://www.emqx.io/docs/)
+> * [GStreamer Docs](https://gstreamer.freedesktop.org/documentation/)
 
 ---
 
 ## 7. Configuración Específica para Estaciones de Analítica
-* **Configuración de MongoDB (Creación de Base de Datos y Usuario):**
-  Accede a la consola de MongoDB:
-  ```bash
-  mongosh
-  ```
-  Crea la base de datos y un usuario con permisos de lectura/escritura (reemplaza `NOMBRE_BD`, `USUARIO`, `PASSWORD` por tus valores reales):
-  ```javascript
-  use NOMBRE_BD
-  db.createUser({
-    user: "USUARIO",
-    pwd: "PASSWORD",
-    roles: [
-      {
-        role: "readWrite",
-        db: "NOMBRE_BD"
-      }
-    ]
-  })
-  ```
-  Edita la configuración de MongoDB para habilitar la autorización:
-  ```bash
-  sudo nano /etc/mongod.conf
-  ```
-  Descomenta la sección `security:` y agrega debajo (indentando 2 espacios):
-  ```yaml
-  security:
-    authorization: enabled
-  ```
-  Guarda (Ctrl+O, Enter) y cierra (Ctrl+X).
-  Reinicia el servicio para aplicar los cambios:
-  ```bash
-  sudo systemctl restart mongod
-  ```
-* **Instalación de NodeRED:**
-  Ejecuta el script de instalación:
-  ```bash
-  bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
-  ```
-  (Opcional) Habilita el servicio manualmente si no lo hizo el script:
-  ```bash
-  sudo systemctl enable nodered
-  sudo systemctl start nodered
-  ```
-  (Opcional) Verifica el estado:
-  ```bash
-  sudo systemctl status nodered
-  ```
 
+> **Nota:** Esta sección instala herramientas para analítica/machine learning, asumiendo Ubuntu 24.04.1 LTS con CUDA instalado. Instala solo lo necesario.
 
-### Herramientas recomendadas para analítica/machine learning
+### Configuración de MongoDB (Base de Datos y Usuario)
 
-A continuación se listan las instalaciones de herramientas adicionales para estaciones de analítica.
+#### Paso 1: Accede a la Consola
+```bash
+mongosh
+```
 
-* **Instalación de Python y Pip:**
-  
-  ```bash
-  sudo apt install -y python3 python3-pip
-  ```
+#### Paso 2: Crea Base de Datos y Usuario
+Reemplaza placeholders:
+```javascript
+use NOMBRE_BD
+db.createUser({
+  user: "USUARIO",
+  pwd: "PASSWORD",
+  roles: [
+    {
+      role: "readWrite",
+      db: "NOMBRE_BD"
+    }
+  ]
+})
+```
 
-* **Instalación de Bibliotecas Python para Machine Learning:**
-  
-  Actualiza pip:
-  ```bash
-  pip3 install --upgrade pip
-  ```
-  
-  Instala las bibliotecas necesarias:
-  ```bash
-  pip3 install pandas numpy scikit-learn paho-mqtt ultralytics
-  ```
-  
-  > **Nota:** Puedes agregar más bibliotecas según tus necesidades (matplotlib, tensorflow, pytorch, opencv-python, etc.).
+Sal con `exit`.
+
+#### Paso 3: Habilita Autorización
+Edita config:
+```bash
+sudo nano /etc/mongod.conf
+```
+
+Agrega bajo `security:`:
+```yaml
+security:
+  authorization: enabled
+```
+
+Guarda y reinicia:
+```bash
+sudo systemctl restart mongod
+```
+
+**Verificación:**
+```bash
+mongosh -u USUARIO -p PASSWORD --authenticationDatabase NOMBRE_BD
+# Debería conectar
+```
+
+### Instalación de Node-RED
+
+#### Paso 1: Ejecuta el Script de Instalación
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
+```
+
+#### Paso 2: Habilita y Inicia el Servicio
+```bash
+sudo systemctl enable nodered
+sudo systemctl start nodered
+```
+
+**Verificación:**
+```bash
+sudo systemctl status nodered
+# Dashboard en http://localhost:1880
+```
+
+### Instalación de Python y Bibliotecas para Machine Learning
+
+#### Paso 1: Instala Python y Pip
+```bash
+sudo apt install -y python3 python3-pip
+```
+
+#### Paso 2: Actualiza Pip
+```bash
+pip3 install --upgrade pip
+```
+
+#### Paso 3: Instala Bibliotecas
+```bash
+pip3 install pandas numpy scikit-learn paho-mqtt ultralytics
+```
+
+**Verificación:**
+```bash
+python3 -c "import pandas, numpy, sklearn; print('Bibliotecas OK')"
+# Debería imprimir sin errores
+```
+
+### Configuración de Puertos para Estaciones de Analítica (Opcional)
+Si usas firewall, abre puertos:
+
+| Aplicación | Puertos | Protocolo | Comando |
+|------------|---------|-----------|---------|
+| MongoDB | 27017 | TCP | `sudo ufw allow 27017/tcp` |
+| Node-RED | 1880 | TCP | `sudo ufw allow 1880/tcp` |
+
+**Verificación:**
+```bash
+sudo ufw status
+```
+
+### Tips Generales
+- Usa entornos virtuales: `python3 -m venv ml_env && source ml_env/bin/activate`.
+- Actualiza bibliotecas: `pip3 install --upgrade <lib>`.
+
+### Troubleshooting
+- **MongoDB auth falla:** Verifica config en `/etc/mongod.conf`.
+- **Node-RED no inicia:** Revisa logs: `sudo journalctl -u nodered`.
+- **Pip instala lento:** Usa mirror: `pip3 install --index-url https://pypi.org/simple <lib>`.
 
 > **Recursos Adicionales:**
-> * [Documentación oficial de Node-RED](https://nodered.org/docs/)
-> * [Documentación de MongoDB](https://www.mongodb.com/docs/)
-> * [Pandas Documentation](https://pandas.pydata.org/docs/)
-> * [Scikit-learn Documentation](https://scikit-learn.org/stable/)
-
-> **Tip:** Actualiza pip regularmente y considera usar entornos virtuales para proyectos específicos.
+> * [Node-RED Docs](https://nodered.org/docs/)
+> * [MongoDB Docs](https://www.mongodb.com/docs/)
+> * [Pandas Docs](https://pandas.pydata.org/docs/)
 
 ---
 
 ## 8. Gestión de la Interfaz Gráfica
 
+> **Nota:** Ubuntu usa GDM3 como display manager. Gestiona el entorno gráfico para liberar recursos en servidores o solucionar issues con GPUs.
 
-### ¿Cómo activar o desactivar el entorno gráfico?
+### Verificar Estado Actual
+Antes de cambiar, checkea el target actual:
+```bash
+systemctl get-default  # Debería mostrar graphical.target o multi-user.target
+who  # Muestra sesiones activas
+```
 
-* **Desactivar**
+### Desactivar Entorno Gráfico (Modo Texto/Servidor)
+Útil para servidores headless o troubleshooting.
 
-  ```bash
-  sudo systemctl disable gdm3
-  sudo systemctl set-default multi-user.target
-  sudo reboot
-  ```
+#### Paso 1: Deshabilita GDM3
+```bash
+sudo systemctl disable gdm3
+sudo systemctl set-default multi-user.target
+```
 
-* **Reactivar**
+#### Paso 2: Reinicia
+```bash
+sudo reboot
+```
 
-  ```bash
-  sudo systemctl enable gdm3
-  sudo systemctl set-default graphical.target
-  sudo reboot
-  ```
+**Verificación:**
+```bash
+systemctl get-default  # multi-user.target
+# No verás entorno gráfico al bootear
+```
 
-> **Explicación:** Desactivar la interfaz gráfica libera recursos, útil en servidores administrados por SSH.
+### Reactivar Entorno Gráfico
+Para uso desktop normal.
+
+#### Paso 1: Habilita GDM3
+```bash
+sudo systemctl enable gdm3
+sudo systemctl set-default graphical.target
+```
+
+#### Paso 2: Reinicia
+```bash
+sudo reboot
+```
+
+**Verificación:**
+```bash
+systemctl get-default  # graphical.target
+# Deberías ver login gráfico
+```
+
+### Alternativas y Tips
+- **Cambiar sin reinicio:** Usa `sudo systemctl isolate multi-user.target` (temporal).
+- **Otro DM:** Si prefieres LightDM: `sudo apt install lightdm && sudo dpkg-reconfigure lightdm`.
+- **Issues con GPUs:** Si pantalla negra, fuerza Xorg en `/etc/gdm3/custom.conf` (ver sección 3).
+
+### Troubleshooting
+- **GDM3 no inicia:** Logs: `sudo journalctl -u gdm`.
+- **Pantalla negra:** Agrega `nomodeset` en GRUB (ver sección 2).
+- **No cambia target:** `sudo systemctl daemon-reload` y reintenta.
+
+> **Explicación:** Desactivar libera RAM/CPU; reactivar para apps GUI. Usa según necesidad.
 
 ---
 
 ## 9. Solución de Problemas Comunes con Redes en Placas Nuevas
 
+> **Nota:** Problemas de red en placas nuevas suelen ser por drivers incompatibles. Usa `lspci | grep Network` para identificar el chip. Reinicia después de cambios.
 
-### ¿Problemas con Realtek RTL8125?
+### Problemas con Realtek RTL8125 (Ethernet)
 
-En placas madre muy nuevas, especialmente las que usan chips Realtek RTL8125, puede ocurrir que el controlador predeterminado (`r8169`) no funcione correctamente, y sea necesario usar el controlador `r8125` específico.
+#### Diagnóstico
+```bash
+ip link show  # Busca ethX/enpXsY DOWN
+lspci | grep RTL8125  # Confirma chip
+```
 
-1.  **Diagnóstico:** Verifique si la interfaz de red está presente y activa:
+#### Solución
+1. Actualiza sistema: `sudo apt update && sudo apt full-upgrade -y`
+2. Agrega PPA: `sudo add-apt-repository ppa:kelebek333/rtl-kernel -y && sudo apt update`
+3. Instala driver: `sudo apt install r8125-dkms -y`
+4. Bloquea antiguo: `echo 'blacklist r8169' | sudo tee /etc/modprobe.d/blacklist-r8169.conf`
+5. Actualiza initramfs: `sudo update-initramfs -u`
+6. Reinicia: `sudo reboot`
 
-    ```bash
-    ip link show
-    # Busque una interfaz tipo ethX o enpXsY que no esté "DOWN"
-    ```
+**Verificación:** `ip link show` (debería estar UP), `lspci | grep -i ethernet`
 
-    Si no aparece o está inactiva, puede ser un problema de controlador.
-2.  **Actualizar el sistema:**
+### Problemas con Intel Ethernet (ej. I219, I225)
 
-    ```bash
-    sudo apt update && sudo apt full-upgrade -y
-    ```
-3.  **Agregar PPA y reinstalar controlador:**
-    *(Este PPA contiene versiones actualizadas de controladores)*
+#### Diagnóstico
+```bash
+lspci | grep Ethernet  # Busca Intel
+dmesg | grep e1000e  # Errores?
+```
 
-    ```bash
-    sudo add-apt-repository ppa:kelebek333/rtl-kernel -y
-    sudo apt update
-    sudo apt install r8125-dkms -y
-    ```
-4.  **Bloquear controlador antiguo:** Cree un archivo para evitar que el kernel cargue el controlador `r8169`.
+#### Solución
+1. Instala driver actualizado: `sudo apt install -y backport-iwlwifi-dkms`
+2. O usa PPA: `sudo add-apt-repository ppa:canonical-hwe-team/backport-iwlwifi -y && sudo apt update && sudo apt install backport-iwlwifi-dkms`
+3. Reinicia: `sudo reboot`
 
-    ```bash
-    echo 'blacklist r8169' | sudo tee /etc/modprobe.d/blacklist-r8169.conf
-    ```
-5.  **Actualizar initramfs:** Esto asegura que el cambio se aplique al arranque.
+**Verificación:** `ip a` (IP asignada), `ping 8.8.8.8`
 
-    ```bash
-    sudo update-initramfs -u
-    ```
-6.  **Reiniciar:**
+### Problemas con Wi-Fi (Broadcom, etc.)
 
-    ```bash
-    sudo reboot
-    ```
-7.  **Verificación Post-Reinicio:** Confirme que la interfaz de red ahora esté disponible.
+#### Diagnóstico
+```bash
+iwconfig  # Lista interfaces Wi-Fi
+lspci | grep Network  # Identifica chip
+```
 
-    ```bash
-    ip link show
-    lspci | grep -i ethernet
-    ```
+#### Solución para Broadcom
+1. Instala bcmwl: `sudo apt install bcmwl-kernel-source`
+2. Reinicia: `sudo reboot`
 
-> **Tip:** Si la red sigue sin funcionar, revisa el modelo exacto de tu placa y busca controladores específicos.
+**Verificación:** `iwconfig` (debería mostrar wlan0 UP)
+
+### DNS No Resuelve Nombres
+
+#### Diagnóstico
+```bash
+nslookup google.com  # Falla?
+cat /etc/resolv.conf  # Nameservers
+```
+
+#### Solución
+1. Edita resolv.conf: `sudo nano /etc/resolv.conf`
+2. Agrega: `nameserver 8.8.8.8` y `nameserver 1.1.1.1`
+3. O usa systemd: `sudo systemctl restart systemd-resolved`
+
+**Verificación:** `nslookup google.com` (debería resolver)
+
+### Conexión Lenta o Intermitente
+
+#### Diagnóstico
+```bash
+speedtest-cli  # Velocidad
+dmesg | grep -i network  # Errores
+```
+
+#### Solución
+1. Desactiva IPv6: `sudo nano /etc/sysctl.conf` agrega `net.ipv6.conf.all.disable_ipv6=1`
+2. Aplica: `sudo sysctl -p`
+3. Cambia MTU: `sudo ip link set dev enpXsY mtu 1450`
+
+**Verificación:** `speedtest-cli`, reinicia y testea.
+
+### Configurar IP Estática
+
+#### Solución
+1. Edita Netplan: `sudo nano /etc/netplan/01-netcfg.yaml`
+2. Ejemplo:
+   ```yaml
+   network:
+     version: 2
+     ethernets:
+       enp0s3:
+         dhcp4: no
+         addresses: [192.168.1.100/24]
+         gateway4: 192.168.1.1
+         nameservers:
+           addresses: [8.8.8.8, 1.1.1.1]
+   ```
+3. Aplica: `sudo netplan apply`
+
+**Verificación:** `ip a` (IP estática), `ping google.com`
+
+### Problemas con VPN
+
+#### Diagnóstico
+```bash
+sudo systemctl status openvpn  # Si usas OpenVPN
+journalctl -u openvpn  # Logs
+```
+
+#### Solución
+1. Instala OpenVPN: `sudo apt install openvpn`
+2. Conecta: `sudo openvpn config.ovpn`
+3. Para WireGuard: `sudo apt install wireguard` y configura.
+
+**Verificación:** `ip a` (tun interface), `curl ifconfig.me` (IP externa cambia)
+
+### Troubleshooting General
+- **No conecta:** `sudo systemctl restart NetworkManager`
+- **Drivers faltan:** Busca en repos: `sudo apt search <chip>`
+- **Logs:** `sudo journalctl -u NetworkManager`
+- **Reset:** `sudo nmcli networking off && sudo nmcli networking on`
+
+> **Tip:** Si nada funciona, instala drivers desde sitio del fabricante o usa USB Ethernet.
 
 ---
 
 ## 10. Wake-on-LAN (WOL): Windows a Windows y Ubuntu a Windows
 
-#### Ejemplo de script PowerShell para Windows → Windows
-<details>
-<summary>Click para ver el script de PowerShell para WOL</summary>
+> **Nota:** WOL despierta PCs por red enviando un "paquete mágico". Requiere Ethernet (no Wi-Fi). Configura BIOS y OS primero.
+
+### Configurar WOL en el Equipo Destino (Windows/Ubuntu)
+
+#### En BIOS/UEFI
+1. Entra a BIOS (F2/DEL).
+2. Busca "Power Management" > "Wake on LAN" > "Enabled".
+3. "AC Power Loss" > "Power On" (opcional).
+4. Guarda y sal.
+
+#### En Windows
+1. Ejecuta `powercfg /devicequery wake_armed` (lista dispositivos que pueden despertar).
+2. En Device Manager > Network Adapter > Properties > Power Management > Marca "Allow this device to wake the computer".
+3. En Power Options > "Allow wake timers".
+
+#### En Ubuntu
+1. Instala ethtool: `sudo apt install ethtool`
+2. Habilita WOL: `sudo ethtool -s enpXsY wol g` (reemplaza enpXsY por interfaz, ej. `ip link show`)
+3. Verifica: `sudo ethtool enpXsY | grep Wake-on`
+4. Para persistencia: Crea `/etc/systemd/system/wol.service` con:
+   ```
+   [Unit]
+   Description=Enable WOL
+   After=network.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/sbin/ethtool -s enpXsY wol g
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   Habilita: `sudo systemctl enable wol`
+
+**Verificación:** Apaga el PC, espera 1 min, envía paquete desde otro dispositivo.
+
+### Enviar Paquete WOL desde Windows (a Windows o Ubuntu)
+
+#### Script PowerShell
+Guarda como `Send-WOL.ps1` y ejecuta: `.\Send-WOL.ps1 -Mac AA:BB:CC:DD:EE:FF`
+
+Funciona para despertar PCs Windows o Ubuntu configurados para WOL.
 
 ```powershell
-# Send-WOL.ps1
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)] [string]$Mac,
@@ -758,97 +1183,238 @@ $udp.Close()
 Write-Host "WOL enviado a $Mac via $Broadcast:$Port"
 ```
 
-</details>
+### Enviar Paquete WOL desde Ubuntu
 
-#### Ejemplo de envío desde Ubuntu
+#### Instala herramientas
 ```bash
-wakeonlan -i 192.168.6.255 AA:BB:CC:DD:EE:FF
-# o
-sudo etherwake -i eno1 AA:BB:CC:DD:EE:FF
+sudo apt install wakeonlan etherwake
 ```
 
+#### Envía paquete
+```bash
+wakeonlan -i 192.168.1.255 AA:BB:CC:DD:EE:FF  # Broadcast IP de tu red
+# o
+sudo etherwake -i enpXsY AA:BB:CC:DD:EE:FF
+```
 
-### ¿Cómo despertar un PC por red?
+**Verificación:** Usa Wireshark/tcpdump para ver paquete: `sudo tcpdump -i enpXsY port 9`
 
-* Configura correctamente la BIOS y Windows en el equipo destino.
-* Envía el paquete mágico desde Windows (PowerShell) o Ubuntu (`wakeonlan` o `etherwake`).
-* Verifica el envío con Wireshark o tcpdump.
-* Consulta la sección de problemas comunes si no funciona.
+### Troubleshooting
+- **No despierta:** Verifica BIOS, cable Ethernet, firewall bloquea puerto 9.
+- **MAC incorrecta:** `ip link show` o `arp -a` para obtener.
+- **Broadcast IP:** Usa `ip route | grep default` para subnet.
+- **Persistencia:** En Ubuntu, agrega a cron: `@reboot sudo ethtool -s enpXsY wol g`
 
-> **Nota:** WOL por Wi-Fi casi nunca está soportado. Usa siempre Ethernet.
+> **Nota:** WOL por Wi-Fi no funciona. Usa Ethernet. Prueba con PCs en misma red local.
 
 ---
 
 ## 11. Script de Post-Instalación (Opcional)
 
-Para automatizar la preparación del sistema, puedes crear un script `setup.sh` con los siguientes comandos. Esto consolida la actualización e instalación de dependencias en un solo paso.
+> **Nota:** Este script automatiza la preparación inicial (sección 3). Actualízalo según tus necesidades. Ejecuta como root o con sudo.
 
-**Contenido de `setup.sh`:**
+### Script Mejorado `setup.sh`
+Incluye dependencias adicionales y opciones.
+
 ```bash
 #!/bin/bash
 # Script para la preparación inicial del sistema Ubuntu
+# Versión mejorada con más herramientas
+
+set -e  # Salir en error
 
 echo "--- Actualizando el sistema ---"
 sudo apt update && sudo apt upgrade -y
 
 echo "--- Instalando dependencias comunes ---"
-sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget
+sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors neofetch
 
-echo "--- Habilitando firewall para SSH ---"
-sudo ufw allow ssh
-sudo ufw --force enable
+echo "--- Configurando GDM3 (desactivar Wayland) ---"
+sudo sed -i 's/#WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
 
-echo "--- Preparación completada. Se recomienda reiniciar el sistema. ---"
-read -p "¿Deseas reiniciar ahora? (s/n): " choice
+echo "--- Configurando firewall (opcional) ---"
+read -p "¿Habilitar UFW con SSH? (s/n): " ufw_choice
+if [[ $ufw_choice =~ ^[sS]$ ]]; then
+  sudo ufw allow ssh
+  sudo ufw --force enable
+fi
+
+echo "--- Verificaciones ---"
+echo "GCC versión: $(gcc --version | head -1)"
+echo "Git versión: $(git --version)"
+echo "Firewall status: $(sudo ufw status | head -1)"
+
+echo "--- Preparación completada. Reinicio recomendado. ---"
+read -p "¿Reiniciar ahora? (s/n): " choice
 case "$choice" in
   s|S ) sudo reboot;;
-  * ) echo "Reinicio manual requerido.";;
+  * ) echo "Ejecuta 'sudo reboot' manualmente.";;
 esac
 ```
 
-**Cómo usarlo:**
-1. Guarda el contenido anterior en un archivo llamado `setup.sh`.
-2. Dale permisos de ejecución: `chmod +x setup.sh`
-3. Ejecútalo: `./setup.sh`
+### Cómo Usarlo
+1. Crea el archivo: `nano setup.sh`
+2. Pega el contenido y guarda.
+3. Permisos: `chmod +x setup.sh`
+4. Ejecuta: `./setup.sh` (o `sudo ./setup.sh` si necesita root)
+
+### Personalización
+- Agrega más installs: `sudo apt install -y <paquete>`
+- Quita opciones: Comenta líneas con `#`
+- Logging: Agrega `>> setup.log` a comandos.
+
+### Troubleshooting
+- Si falla: Revisa logs en terminal.
+- Permisos: Asegura que el script tenga ejecución.
+- Dependencias: Verifica internet para apt.
 
 ---
 
 ## 12. Buenas Prácticas de Seguridad (Opcional)
 
-Una vez que tu estación de trabajo esté operativa, considera aplicar estas medidas de seguridad básicas, especialmente si será accesible remotamente:
+> **Nota:** Estas medidas fortalecen Ubuntu, especialmente para acceso remoto. Aplica solo lo necesario; más seguridad puede complicar uso.
 
-*   **Cambiar el puerto de SSH:** Edita el archivo `/etc/ssh/sshd_config` y cambia la línea `Port 22` a un puerto no estándar (ej. `Port 2222`). Esto reduce la exposición a bots automatizados. No olvides permitir el nuevo puerto en el firewall (`sudo ufw allow 2222`).
-*   **Usar autenticación por clave SSH:** Deshabilita el login por contraseña para SSH. Es mucho más seguro.
-    1.  Genera un par de claves en tu máquina local: `ssh-keygen -t rsa -b 4096`
-    2.  Copia tu clave pública al servidor: `ssh-copy-id usuario@ip_del_servidor`
-    3.  Deshabilita la autenticación por contraseña en `/etc/ssh/sshd_config` cambiando `PasswordAuthentication yes` a `no`.
-*   **Mantener el sistema actualizado:** Ejecuta `sudo apt update && sudo apt upgrade -y` periódicamente para aplicar parches de seguridad.
+### SSH Seguro
+
+#### Cambiar Puerto SSH
+Reduce escaneo de bots.
+
+1. Edita config: `sudo nano /etc/ssh/sshd_config`
+2. Cambia: `Port 22` a `Port 2222`
+3. Reinicia SSH: `sudo systemctl restart ssh`
+4. Firewall: `sudo ufw allow 2222/tcp && sudo ufw delete allow 22/tcp`
+
+**Verificación:** `ss -tlnp | grep 2222`
+
+#### Autenticación por Clave SSH
+Deshabilita passwords.
+
+1. Genera clave local: `ssh-keygen -t ed25519 -C "tu_email"`
+2. Copia a servidor: `ssh-copy-id -p 2222 usuario@ip_servidor`
+3. Deshabilita password: `sudo nano /etc/ssh/sshd_config` > `PasswordAuthentication no`
+4. Reinicia: `sudo systemctl restart ssh`
+
+**Verificación:** Intenta login con password (debe fallar).
+
+#### Deshabilitar Root Login
+Previene acceso directo como root.
+
+1. Edita: `sudo nano /etc/ssh/sshd_config` > `PermitRootLogin no`
+2. Reinicia: `sudo systemctl restart ssh`
+
+### Firewall y Monitoreo
+
+#### Instalar Fail2Ban
+Bloquea IPs con intentos fallidos.
+
+1. Instala: `sudo apt install fail2ban`
+2. Habilita: `sudo systemctl enable fail2ban`
+3. Config: `sudo nano /etc/fail2ban/jail.local` (ej. `[sshd]` con `port = 2222`)
+
+**Verificación:** `sudo fail2ban-client status sshd`
+
+#### Actualizaciones Automáticas
+Mantén sistema seguro.
+
+1. Instala unattended-upgrades: `sudo apt install unattended-upgrades`
+2. Config: `sudo dpkg-reconfigure unattended-upgrades`
+3. O cron: `sudo crontab -e` > `0 2 * * * apt update && apt upgrade -y`
+
+**Verificación:** `sudo unattended-upgrades --dry-run`
+
+### Otras Prácticas
+
+- **Backups:** Usa `rsync` o `borgbackup` para backups.
+- **Antivirus:** Instala `clamav` para scans: `sudo apt install clamav`
+- **Logs:** Monitorea con `journalctl` o `logwatch`.
+- **VPN:** Usa WireGuard para acceso remoto seguro.
+
+### Troubleshooting
+- **SSH no conecta:** Verifica puerto y firewall.
+- **Fail2Ban bloquea:** `sudo fail2ban-client unban <IP>`
+- **Updates fallan:** `sudo apt --fix-broken install`
+
+> **Tip:** Usa herramientas como `lynis` para auditoría: `sudo apt install lynis && sudo lynis audit system`
 
 ---
 
 ## FAQ: Preguntas Frecuentes
 
 * **¿Qué hago si el driver NVIDIA no se instala correctamente?**
-  * Revisa la compatibilidad en el Anexo B y asegúrate de haber eliminado drivers antiguos.
+  * Revisa la compatibilidad en el Anexo B y asegúrate de haber eliminado drivers antiguos. Ejecuta `sudo apt purge nvidia*` y reinicia antes de reinstalar.
 
 * **¿Cómo sé qué versión de CUDA instalar?**
-  * Consulta la web oficial y verifica la compatibilidad con tu GPU y driver.
+  * Consulta la web oficial y verifica la compatibilidad con tu GPU y driver. Para series modernas (3000/4000/5000), usa CUDA 12.8 con driver >=525.x.
 
 * **¿Por qué no funciona Wake-on-LAN?**
-  * Verifica configuración de BIOS, opciones de energía y que el equipo esté conectado por cable.
+  * Verifica configuración de BIOS, opciones de energía y que el equipo esté conectado por cable. Ejecuta `sudo ethtool enpXsY` para checkear soporte WOL.
 
 * **¿Puedo usar esta guía en variantes de Ubuntu?**
-  * Sí, pero puede haber diferencias menores. Se recomienda Ubuntu Desktop.
+  * Sí, pero puede haber diferencias menores. Se recomienda Ubuntu Desktop. Para Server, omite secciones GUI.
+
+* **¿Cómo verifico si mi GPU es compatible?**
+  * Usa `lspci -nn | grep VGA` para el Device ID, luego busca en Anexo A. Confirma con `nvidia-smi` después de instalar drivers.
+
+* **¿Qué pasa si CUDA no reconoce la GPU?**
+  * Asegúrate de que drivers estén instalados correctamente (`nvidia-smi`). Reinicia si es necesario. Verifica compatibilidad en Anexo B.
+
+* **¿Cómo instalo cuDNN después de CUDA?**
+  * Descarga el .deb desde NVIDIA, instala con `sudo dpkg -i libcudnn*.deb`. Verifica con `cat /usr/include/cudnn_version.h`.
+
+* **¿Por qué la pantalla queda negra después de instalar drivers?**
+  * Agrega `nomodeset` en GRUB (sección 2). Si usas GDM3, fuerza Xorg en `/etc/gdm3/custom.conf`.
+
+* **¿Cómo configuro red en placas nuevas?**
+  * Identifica el chip con `lspci | grep Network`, instala drivers apropiados (ej. `sudo apt install r8168-dkms` para Realtek).
+
+* **¿Puedo usar Docker con NVIDIA GPUs?**
+  * Sí, instala nvidia-docker2: `sudo apt install nvidia-docker2`. Ejecuta con `--gpus all`.
+
+* **¿Cómo libero memoria GPU para otras apps?**
+  * Desactiva entorno gráfico: `sudo systemctl set-default multi-user.target && sudo reboot`. Reactiva con `graphical.target`.
+
+* **¿Qué hago si MongoDB o Node-RED no inician?**
+  * Revisa logs: `sudo journalctl -u mongod` o `sudo journalctl -u nodered`. Verifica puertos con `sudo netstat -tlnp`.
+
+* **¿Cómo actualizo el kernel sin romper drivers?**
+  * Actualiza normalmente: `sudo apt update && sudo apt upgrade`. Si hay issues, reinstala drivers después.
+
+* **¿Es seguro usar el script post-install?**
+  * Revisa el código antes de ejecutar. Hace backups y configura según la guía, pero úsalo con precaución en producción.
+
+* **¿Dónde encuentro logs de errores?**
+  * Drivers: `/var/log/nvidia-installer.log`. Sistema: `sudo journalctl -xe`. CUDA: logs en `/var/log/cuda-installer.log`.
+
+* **¿Cómo desinstalo todo NVIDIA para reinstalar?**
+  * Ejecuta `sudo apt purge nvidia* cuda* libcudnn*`, elimina `/usr/local/cuda*`, reinicia y sigue la guía desde cero.
 
 ---
 
 ## Anexo A: Identificación de GPUs NVIDIA
 
-Esta tabla ayuda a identificar la generación de su GPU NVIDIA basándose en la salida de `lspci | grep VGA`.
+> **Nota:** Para identificar tu GPU, ejecuta `lspci -nn | grep VGA` (muestra Device ID en [xxxx:yyyy]). Busca el ID en las tablas abajo. Si no encuentras, usa `nvidia-smi` si drivers están instalados.
 
-# NVIDIA GeForce RTX Serie 3000 - Identificación PCI
+### Cómo Identificar
+1. Ejecuta: `lspci -nn | grep VGA`
+   - Ejemplo salida: `01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA104 [GeForce RTX 3070] [10de:2484]`
+   - Device ID: `2484` (últimos 4 dígitos).
+2. Busca el ID en las tablas.
+3. Si es NVIDIA, confirma con `nvidia-smi` (versión driver).
 
-Esta tabla lista los Device IDs para las tarjetas RTX de la serie 3000 (arquitectura Ampere), útiles para identificar con `lspci | grep VGA`.
+### Script Simple para Identificación
+Crea `identify_gpu.sh`:
+```bash
+#!/bin/bash
+echo "Buscando GPUs NVIDIA..."
+lspci -nn | grep -i nvidia | while read line; do
+  device_id=$(echo $line | grep -oP '\[10de:\K[0-9a-f]{4}')
+  model=$(echo $line | sed -n 's/.*NVIDIA Corporation \([^[]*\).*/\1/p')
+  echo "Modelo: $model | Device ID: $device_id"
+done
+```
+Ejecuta: `chmod +x identify_gpu.sh && ./identify_gpu.sh`
+
+# NVIDIA GeForce RTX Serie 3000 - Identificación PCI (Ampere)
 
 | Serie | Modelo      | Device ID (hex) |
 | ----- | ----------- | --------------- |
@@ -863,9 +1429,7 @@ Esta tabla lista los Device IDs para las tarjetas RTX de la serie 3000 (arquitec
 | 3000  | RTX 3050 Ti | 2191            |
 | 3000  | RTX 3050    | 25A0            |
 
-# NVIDIA GeForce RTX Serie 4000 - Identificación PCI
-
-Esta tabla lista los Device IDs para las tarjetas RTX de la serie 4000 (arquitectura Ada Lovelace), útiles para identificar con `lspci | grep VGA`.
+# NVIDIA GeForce RTX Serie 4000 - Identificación PCI (Ada Lovelace)
 
 | Serie | Modelo            | Device ID (hex) |
 | ----- | ----------------- | --------------- |
@@ -880,9 +1444,7 @@ Esta tabla lista los Device IDs para las tarjetas RTX de la serie 4000 (arquitec
 | 4000  | RTX 4060          | 2882            |
 | 4000  | RTX 4050          | 28A1            |
 
-# NVIDIA GeForce RTX Serie 5000 - Identificación PCI
-
-Esta tabla lista los Device IDs para las tarjetas RTX de la serie 5000 (arquitectura Blackwell), útiles para identificar con `lspci | grep VGA`. Nota: Los IDs están basados en datos iniciales de 2025 y podrían actualizarse.
+# NVIDIA GeForce RTX Serie 5000 - Identificación PCI (Blackwell)
 
 | Serie | Modelo      | Device ID (hex) |
 | ----- | ----------- | --------------- |
@@ -897,18 +1459,86 @@ Esta tabla lista los Device IDs para las tarjetas RTX de la serie 5000 (arquitec
 
 ## Anexo B: Verificación de Compatibilidad
 
-Antes de instalar drivers o CUDA, verifique la compatibilidad.
+> **Nota:** Antes de instalar drivers o CUDA, verifica compatibilidad para evitar errores. Usa comandos para checkear versiones instaladas. Si hay incompatibilidades, actualiza o downgradéa según necesidad.
 
-1. **GPU y Driver NVIDIA:**
+### Verificar Versiones Instaladas
+Ejecuta estos comandos para confirmar tu setup actual:
 
-   * Visite [https://www.nvidia.com/drivers/](https://www.nvidia.com/drivers/).
-   * Seleccione su GPU y sistema operativo. La página mostrará los drivers compatibles.
-2. **Driver NVIDIA y CUDA Toolkit:**
+#### Driver NVIDIA
+```bash
+nvidia-smi  # Muestra versión driver, CUDA runtime, GPU
+# Ejemplo salida: Driver Version: 550.54.14
+```
 
-   * Visite [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads).
-   * Busque la "CUDA Compatibility" o "CUDA Requirements" en la documentación o en la propia página de descargas.
-   * Por ejemplo, CUDA 12.8 requiere un driver de NVIDIA >= 525.x.
-   * Verifique la versión de su driver con `nvidia-smi`. El número de versión debe ser mayor o igual al mínimo requerido por CUDA.
-3. **CUDA Toolkit y Ubuntu:**
+#### CUDA Toolkit
+```bash
+nvcc --version  # Versión del compilador CUDA
+# Si no está instalado: "Command 'nvcc' not found"
+```
 
-   * La página de descargas de CUDA mencionada arriba también lista las versiones de Ubuntu soportadas para cada versión de CUDA Toolkit.
+#### cuDNN (si instalado)
+```bash
+cat /usr/include/cudnn_version.h | grep CUDNN_MAJOR -A 2  # Versión cuDNN
+# Ejemplo: #define CUDNN_MAJOR 9
+```
+
+#### Ubuntu Kernel y GCC
+```bash
+uname -r  # Versión kernel (ej. 6.8.0-40-generic)
+gcc --version | head -1  # Versión GCC (ej. gcc 11.4.0)
+```
+
+### Compatibilidad Recomendada (Noviembre 2025)
+Basado en NVIDIA docs. Usa la versión más reciente compatible con tu GPU (series 3000/4000/5000).
+
+#### Drivers NVIDIA y GPUs
+| Serie GPU | Arquitectura | Driver Mínimo Recomendado | Driver Más Reciente |
+|-----------|--------------|---------------------------|---------------------|
+| RTX 3000 (Ampere) | GA10x | 470.x | 550.x |
+| RTX 4000 (Ada Lovelace) | AD10x | 525.x | 550.x |
+| RTX 5000 (Blackwell) | GB20x | 550.x | 560.x (beta) |
+
+**Nota:** Drivers 550.x soportan todas las series modernas. Para RTX 5000, usa 560.x si disponible.
+
+#### CUDA Toolkit y Drivers
+| CUDA Version | Driver Mínimo | Driver Máximo | Soporte Ubuntu |
+|--------------|---------------|---------------|----------------|
+| 12.8 | 525.60.13 | N/A | 22.04, 24.04 |
+| 12.6 | 525.60.13 | N/A | 20.04, 22.04, 24.04 |
+| 12.4 | 470.42.01 | N/A | 18.04, 20.04, 22.04 |
+| 12.2 | 460.32.03 | N/A | 18.04, 20.04, 22.04 |
+
+**Nota:** CUDA 12.8 es la más reciente; requiere driver >=525.x. No instales versiones antiguas innecesariamente.
+
+#### cuDNN y CUDA
+| cuDNN Version | CUDA Compatible | Notas |
+|---------------|-----------------|-------|
+| 9.3.x | 12.8 | Recomendado para ML moderno |
+| 9.2.x | 12.6 | Compatible con 12.8 |
+| 9.1.x | 12.4 | Legacy |
+| 9.0.x | 12.2 | Legacy |
+
+**Nota:** Descarga cuDNN desde [NVIDIA cuDNN](https://developer.nvidia.com/cudnn). Instala después de CUDA.
+
+### Cómo Verificar Compatibilidad Online
+1. **Para Drivers:** Ve a [NVIDIA Drivers](https://www.nvidia.com/drivers/), selecciona tu GPU y OS.
+2. **Para CUDA:** Ve a [CUDA Downloads](https://developer.nvidia.com/cuda-downloads), elige tu OS y GPU.
+3. **Para cuDNN:** Consulta [cuDNN Support Matrix](https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html).
+
+### Troubleshooting de Compatibilidades
+- **Driver demasiado viejo para CUDA:** Actualiza driver: `sudo apt update && sudo apt install nvidia-driver-550`.
+- **CUDA no reconoce GPU:** Verifica con `nvidia-smi`. Si falla, reinstala drivers.
+- **cuDNN error:** Confirma versiones: `cat /usr/include/cudnn.h | grep CUDNN_VERSION`.
+- **Kernel mismatch:** Actualiza kernel: `sudo apt update && sudo apt upgrade`.
+- **GCC incompatible:** Instala versión correcta: `sudo apt install gcc-11 g++-11`.
+
+### Tips Generales
+- **Instala en orden:** Drivers → CUDA → cuDNN → Bibliotecas (cuBLAS, etc.).
+- **Prueba con samples:** Después de instalar, ejecuta CUDA samples: `cd /usr/local/cuda/samples && make && ./bin/x86_64/linux/release/deviceQuery`.
+- **Si usas Docker:** Usa imágenes NVIDIA: `nvidia-docker run --rm nvidia/cuda:12.8-base-ubuntu24.04 nvidia-smi`.
+- **Backup antes de cambios:** Crea snapshot o backup de drivers.
+
+> **Recursos Adicionales:**
+> * [NVIDIA CUDA Toolkit Release Notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html)
+> * [cuDNN Installation Guide](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html)
+> * [Ubuntu NVIDIA Drivers PPA](https://launchpad.net/~graphics-drivers/+archive/ubuntu/ppa)
