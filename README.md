@@ -1,6 +1,6 @@
 # Guía Mejorada de Configuración de Estaciones de Trabajo Ubuntu con GPU NVIDIA
 
-> **Última actualización:** 30 de Noviembre de 2025
+> **Última actualización:** 31 de Marzo de 2026
 
 ---
 
@@ -17,7 +17,8 @@
 * [9. Solución de Problemas Comunes con Redes en Placas Nuevas](#9-solución-de-problemas-comunes-con-redes-en-placas-nuevas)
 * [10. Wake-on-LAN (WOL): Windows a Windows y Ubuntu a Windows](#10-wake-on-lan-wol-windows-a-windows-y-ubuntu-a-windows)
 * [11. Script de Post-Instalación (Opcional)](#11-script-de-post-instalación-opcional)
-* [12. Buenas Prácticas de Seguridad (Opcional)](#12-buenas-prácticas-de-seguridad-opcional)
+* [12. Scripts Doctor de Verificación](#12-scripts-doctor-de-verificación)
+* [13. Buenas Prácticas de Seguridad (Opcional)](#13-buenas-prácticas-de-seguridad-opcional)
 * [FAQ: Preguntas Frecuentes](#faq-preguntas-frecuentes)
 * [Anexo A: Identificación de GPUs NVIDIA](#anexo-a-identificación-de-gpus-nvidia)
 * [Anexo B: Verificación de Compatibilidad](#anexo-b-verificación-de-compatibilidad)
@@ -30,7 +31,14 @@
 
 ## Resumen Visual del Proceso
 
-`BIOS/UEFI` → `Instalación de Ubuntu` → `Preparación del Sistema` → `Drivers NVIDIA` → `CUDA Toolkit` → `Configuración Específica`
+```mermaid
+graph LR
+    A[BIOS/UEFI] --> B[Instalación de Ubuntu]
+    B --> C[Preparación del Sistema]
+    C --> D[Drivers NVIDIA]
+    D --> E[CUDA Toolkit]
+    E --> F[Configuración Específica]
+```
 
 ---
 
@@ -48,7 +56,7 @@
 
 ## 2. Instalación del Sistema Ubuntu
 
-> **Nota:** Esta guía asume Ubuntu Desktop 24.04.1 LTS (la más reciente en 2025). Si usas 22.04 LTS, los pasos son similares, pero verifica enlaces de descarga. Asegúrate de respaldar datos importantes antes de proceder, ya que la instalación borrará el disco.
+> **Nota:** Esta guía asume Ubuntu Desktop 24.04.1 LTS. Si usas 22.04 LTS, los pasos son similares, pero verifica enlaces de descarga. Asegúrate de respaldar datos importantes antes de proceder, ya que la instalación borrará el disco.
 
 ### Paso 1: Prepara la USB Booteable
 Necesitas una USB de al menos 8GB con la imagen ISO de Ubuntu.
@@ -56,7 +64,7 @@ Necesitas una USB de al menos 8GB con la imagen ISO de Ubuntu.
 1. **Descarga la imagen ISO:**
    - Ve a [https://ubuntu.com/download/desktop](https://ubuntu.com/download/desktop).
    - Descarga Ubuntu 24.04.1 LTS (archivo ~4GB).
-   - **Verificación:** Calcula el hash SHA256 para confirmar integridad:
+   - **Verificación opcional (recomendada):** Calcula el hash SHA256 para confirmar integridad:
      ```bash
      wget https://releases.ubuntu.com/24.04.1/SHA256SUMS
      sha256sum ubuntu-24.04.1-desktop-amd64.iso
@@ -73,13 +81,14 @@ Necesitas una USB de al menos 8GB con la imagen ISO de Ubuntu.
      sudo ./Ventoy2Disk.sh -i /dev/sdX  # Reemplaza /dev/sdX por tu USB (ej. /dev/sdb). ¡Cuidado, borra todo!
      ```
    - Copia la ISO descargada a la USB (Ventoy la detectará automáticamente).
+   - Tambien se puede instalar con GUI o de forma web, hay un script para levantar la aplicación y otro script para levantar localmente sistema y poder visualizarlo en localhost y ejecutar las operaciones del Ventoy.
 
 3. **Alternativa: Usa BalenaEtcher (si prefieres GUI):**
    - Descarga desde [https://etcher.balena.io/](https://etcher.balena.io/).
    - Instala: `sudo apt install balena-etcher-electron` (en un sistema Linux existente).
    - Flashea la ISO a la USB.
 
-**Verificación:** Inserta la USB en otro PC y verifica que aparezca el menú de boot de Ubuntu.
+**Verificación opcional (recomendada):** Inserta la USB en otro PC y verifica que aparezca el menú de boot de Ubuntu.
 
 ### Paso 2: Accede a la BIOS/UEFI
 Reinicia tu PC y entra al setup de BIOS/UEFI presionando la tecla correcta durante el POST (pantalla inicial). Teclas comunes:
@@ -108,7 +117,7 @@ Una vez dentro:
 5. **Guarda y sal:**
    - Presiona F10 (o la tecla indicada) para guardar y reiniciar.
 
-**Verificación:** El PC debería reiniciar. Si no entraste, intenta de nuevo con otra tecla.
+**Verificación opcional:** El PC debería reiniciar. Si no entraste, intenta de nuevo con otra tecla.
 
 ### Paso 4: Bootea desde la USB
 - Inserta la USB preparada.
@@ -129,8 +138,8 @@ linux /boot/vmlinuz-... nomodeset ---
 **Por qué:** Desactiva el modo gráfico genérico, previniendo conflictos con GPUs no soportadas.
 
 ### Paso 6: Instala Ubuntu
-1. **Selecciona idioma:** Elige Español o English (recomendado para soporte).
-2. **Configura teclado:** Selecciona tu layout (ej. Spanish).
+1. **Selecciona idioma:** Elige **English** (Recomendado para la estructura de los directorios).
+2. **Configura teclado:** Selecciona el idioma del teclado en español para usarlo correctamente.
 3. **Conecta a internet:** Recomendado para actualizaciones durante instalación.
 4. **Tipo de instalación:** Elige "Instalación normal" (no minimal).
 5. **Opciones adicionales:** Marca "Instalar software de terceros" y "Instalar actualizaciones durante la instalación" para codecs multimedia y drivers.
@@ -141,20 +150,20 @@ linux /boot/vmlinuz-... nomodeset ---
    - Zona horaria: Selecciona automáticamente o manual.
 8. **Finaliza:** Espera a que termine (15-30 min). No retires la USB aún.
 
-**Verificación durante instalación:** Si hay errores, anótalos para troubleshooting.
+**Verificación (opcional):** Si hay errores, anótalos para troubleshooting.
 
 ### Paso 7: Post-Instalación Inicial
 1. **Reinicia:** Quita la USB cuando aparezca el mensaje.
 2. **Primer boot:** Inicia sesión con tu usuario.
-3. **Verificaciones básicas:**
+3. **Verificaciones básicas (opcional):**
    - Abre una terminal: `Ctrl+Alt+T`.
    - Versión de Ubuntu: `lsb_release -a` (debería mostrar 24.04.1 LTS).
    - Conexión a internet: `ping -c 4 google.com`.
    - Espacio en disco: `df -h`.
 
-**Si hay problemas gráficos:** Si la pantalla se ve mal, ejecuta `sudo apt update && sudo apt install ubuntu-drivers-common` y reinicia.
+**Si hay problemas gráficos (opcional):** Si la pantalla se ve mal, ejecuta `sudo apt update && sudo apt install ubuntu-drivers-common` y reinicia.
 
-### Troubleshooting Común en Instalación
+### Troubleshooting Común en Instalación (opcional)
 - **USB no bootea:** Verifica que Ventoy esté instalado correctamente (`lsblk` para ver particiones). Prueba otra USB o herramienta.
 - **Pantalla negra en boot:** Agrega `nomodeset` o prueba `acpi=off` en parámetros de GRUB.
 - **Error de particionamiento:** Usa GParted desde live USB para preparar discos.
@@ -181,7 +190,7 @@ sudo nano /etc/gdm3/custom.conf
 - Elimina el `#` para descomentarla (quedará `WaylandEnable=false`).
 - Guarda: Ctrl+O, Enter, Ctrl+X.
 
-**Verificación:** Reinicia y ejecuta `echo $XDG_SESSION_TYPE` (debería mostrar `x11`, no `wayland`).
+**Verificación (opcional):** Reinicia y ejecuta `echo $XDG_SESSION_TYPE` (debería mostrar `x11`, no `wayland`).
 
 **Por qué:** Xorg es más compatible con GPUs NVIDIA.
 
@@ -192,7 +201,7 @@ Actualiza paquetes para seguridad y compatibilidad.
 sudo apt update && sudo apt upgrade -y
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 - `apt list --upgradable` (debería estar vacío si todo se actualizó).
 - Reinicia: `sudo reboot`.
 
@@ -202,10 +211,10 @@ sudo apt update && sudo apt upgrade -y
 Instala herramientas esenciales para desarrollo, gráficos, networking y calidad de vida (como monitoreo y troubleshooting).
 
 ```bash
-sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors neofetch
+sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors fastfetch
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 - `gcc --version` (debería mostrar versión instalada).
 - `glxinfo | grep "OpenGL"` (verifica OpenGL básico).
 - `traceroute google.com` (debería mostrar ruta de red).
@@ -246,7 +255,7 @@ Dependiendo de tu versión, instala dependencias adicionales.
   sudo update-alternatives --config g++
   ```
 
-  **Verificación:**
+  **Verificación (opcional):**
   ```bash
   gcc --version  # Debería mostrar gcc 12.x.x
   g++ --version
@@ -261,7 +270,7 @@ Dependiendo de tu versión, instala dependencias adicionales.
   rm libtinfo5_6.3-2ubuntu0.1_amd64.deb
   ```
 
-  **Verificación:**
+  **Verificación (opcional):**
   ```bash
   dpkg -l | grep libtinfo5  # Debería mostrar instalado
   ```
@@ -313,7 +322,7 @@ sudo apt-get autoremove -y
 sudo reboot
 ```
 
-**Verificación:** Después del reinicio, ejecuta `lspci | grep -i nvidia` nuevamente. No deberías ver drivers cargados (puedes ignorar la línea de hardware).
+**Verificación (opcional):** Después del reinicio, ejecuta `lspci | grep -i nvidia` nuevamente. No deberías ver drivers cargados (puedes ignorar la línea de hardware).
 
 ### Paso 4: Descarga el Driver Oficial
 - Ve a [https://www.nvidia.com/drivers/](https://www.nvidia.com/drivers/).
@@ -326,7 +335,11 @@ wget https://us.download.nvidia.com/XFree86/Linux-x86_64/550.54/NVIDIA-Linux-x86
 ```
 
 - Si el enlace cambia, busca el exacto en la web de NVIDIA.
-- **Verificación:** Lista el archivo descargado: `ls -la NVIDIA-Linux-x86_64-*.run`
+- **Verificación de integridad (recomendada):** Compara el SHA256 del archivo descargado con el publicado en la web de NVIDIA:
+  ```bash
+  sha256sum NVIDIA-Linux-x86_64-550.54.15.run
+  ```
+- **Verificación (opcional):** Lista el archivo descargado: `ls -la NVIDIA-Linux-x86_64-*.run`
 
 ### Paso 5: Prepara la Instalación
 Cambia al modo texto para evitar conflictos gráficos (recomendado, especialmente en servidores).
@@ -342,7 +355,7 @@ Después del reinicio, inicia sesión en modo texto y da permisos de ejecución 
 sudo chmod +x NVIDIA-Linux-x86_64-550.54.15.run
 ```
 
-**Verificación:** Confirma permisos: `ls -la NVIDIA-Linux-x86_64-550.54.15.run` (debería mostrar -rwxr-xr-x).
+**Verificación (opcional):** Confirma permisos: `ls -la NVIDIA-Linux-x86_64-550.54.15.run` (debería mostrar -rwxr-xr-x).
 
 ### Paso 6: Instala el Driver
 Ejecuta el instalador con flags para compatibilidad y actualizaciones futuras.
@@ -360,7 +373,7 @@ sudo ./NVIDIA-Linux-x86_64-550.54.15.run --dkms --no-opengl-files --no-man-page 
 
 La instalación tomará unos minutos. Si falla, revisa logs en `/var/log/nvidia-installer.log`.
 
-**Verificación post-instalación:**
+**Verificación post-instalación (opcional):**
 ```bash
 nvidia-smi
 ```
@@ -389,7 +402,7 @@ sudo systemctl set-default graphical.target
 sudo reboot
 ```
 
-**Verificación final:** Después del reinicio, abre una terminal y ejecuta `nvidia-smi`. Deberías ver la info de tu GPU.
+**Verificación final (opcional):** Después del reinicio, abre una terminal y ejecuta `nvidia-smi`. Deberías ver la info de tu GPU.
 
 ### Método Alternativo: Instalación desde Repositorios APT (Más Fácil pero Menos Óptimo)
 Si prefieres un método más simple sin descargar .run, usa los repositorios de Ubuntu. Este instala drivers desde paquetes APT, pero puede ser menos actualizado que el .run oficial.
@@ -412,7 +425,7 @@ Instala la recomendada (ej. nvidia-driver-550):
 sudo apt install -y nvidia-driver-550
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 nvidia-smi
 # Debería mostrar info de GPU
@@ -451,7 +464,7 @@ sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 ```
 
-**Verificación:** `apt search cuda` debería mostrar paquetes disponibles.
+**Verificación (opcional):** `apt search cuda` debería mostrar paquetes disponibles.
 
 #### Paso 2: Instala CUDA Toolkit
 Para la última versión:
@@ -464,7 +477,7 @@ Para versión específica (ej. 12.8):
 sudo apt-get install -y cuda-toolkit-12-8
 ```
 
-**Verificación:** `nvcc --version` (debería mostrar CUDA 12.8).
+**Verificación (opcional):** `nvcc --version` (debería mostrar CUDA 12.8).
 
 #### Paso 3: Configura Variables de Entorno
 Edita `.bashrc`:
@@ -483,7 +496,7 @@ Guarda y recarga:
 source ~/.bashrc
 ```
 
-**Verificación:** `which nvcc` (debería mostrar /usr/local/cuda-12.8/bin/nvcc).
+**Verificación (opcional):** `which nvcc` (debería mostrar /usr/local/cuda-12.8/bin/nvcc).
 
 ### Método 2: Instalación Manual con Archivo .run
 
@@ -495,7 +508,7 @@ Descarga:
 wget https://developer.download.nvidia.com/compute/cuda/12.8.0/local_installers/cuda_12.8.0_550.54.15_linux.run
 ```
 
-**Verificación:** `ls -la cuda_*.run`
+**Verificación (opcional):** `ls -la cuda_*.run`
 
 #### Paso 2: Prepara el Sistema
 Cambia a modo texto:
@@ -551,7 +564,7 @@ sudo apt-get update
 sudo apt-get install -y cudnn9-cuda-12-8
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 dpkg -l | grep cudnn
 # Debería mostrar cudnn9-cuda-12-8 instalado
@@ -617,7 +630,7 @@ sudo systemctl start mongod
 sudo systemctl enable mongod
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 sudo systemctl status mongod
 mongosh --eval "db.runCommand('ping')"
@@ -643,7 +656,7 @@ sudo apt --fix-broken install
 mongodb-compass &
 ```
 
-**Verificación:** Abre la app y conecta a `mongodb://localhost:27017`.
+**Verificación (opcional):** Abre la app y conecta a `mongodb://localhost:27017`.
 
 **Desinstalación (opcional):**
 ```bash
@@ -653,6 +666,8 @@ sudo apt remove -y mongodb-compass
 ### Instalación de EMQX (Broker MQTT)
 
 #### Paso 1: Instala desde Repositorio
+> **Advertencia de seguridad:** Revisa el contenido del script antes de ejecutarlo con `sudo`. Puedes descargarlo primero con `wget` e inspeccionarlo.
+
 ```bash
 curl -sL https://assets.emqx.com/scripts/install-emqx-deb.sh | sudo bash
 sudo apt-get install -y emqx
@@ -664,7 +679,7 @@ sudo systemctl start emqx
 sudo systemctl enable emqx
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 sudo systemctl status emqx
 # Dashboard en http://localhost:18083 (usuario: admin, pass: public)
@@ -677,7 +692,7 @@ sudo systemctl status emqx
 sudo snap install go --classic
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 go version
 # Debería mostrar versión instalada
@@ -690,7 +705,7 @@ go version
 sudo snap install code --classic
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 code --version
 # Debería mostrar versión
@@ -703,7 +718,7 @@ code --version
 sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio gstreamer1.0-rtsp
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 gst-inspect-1.0 rtspclientsink
 gst-inspect-1.0 nvh264enc
@@ -719,7 +734,7 @@ wget https://github.com/angryip/ipscan/releases/download/3.9.1/ipscan_3.9.1_amd6
 sudo apt install -y ./ipscan_3.9.1_amd64.deb
 ```
 
-**Verificación:** Ejecuta `ipscan` desde terminal o menú.
+**Verificación (opcional):** Ejecuta `ipscan` desde terminal o menú.
 
 ### Instalación de AnyDesk (Soporte Remoto)
 
@@ -743,7 +758,7 @@ sudo ufw allow 6568/tcp
 sudo ufw allow 50001:50003/udp
 ```
 
-**Verificación:** Ejecuta `anydesk` y anota el ID.
+**Verificación (opcional):** Ejecuta `anydesk` y anota el ID.
 
 ### Instalación de RustDesk (Soporte Remoto Alternativo)
 
@@ -754,7 +769,7 @@ wget https://github.com/rustdesk/rustdesk/releases/download/1.2.3/rustdesk-1.2.3
 sudo apt install -y ./rustdesk-1.2.3-x86_64.deb
 ```
 
-**Verificación:** Ejecuta `rustdesk` y configura ID/contraseña.
+**Verificación (opcional):** Ejecuta `rustdesk` y configura ID/contraseña.
 
 ### Configuración de Puertos para Estaciones de Compresión (Opcional)
 Si habilitaste UFW en la sección 3, abre los puertos necesarios para que las aplicaciones funcionen correctamente. Si no usas firewall, omite esta sección.
@@ -845,7 +860,7 @@ Guarda y reinicia:
 sudo systemctl restart mongod
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 mongosh -u USUARIO -p PASSWORD --authenticationDatabase NOMBRE_BD
 # Debería conectar
@@ -854,6 +869,8 @@ mongosh -u USUARIO -p PASSWORD --authenticationDatabase NOMBRE_BD
 ### Instalación de Node-RED
 
 #### Paso 1: Ejecuta el Script de Instalación
+> **Advertencia de seguridad:** Revisa el contenido del script antes de ejecutarlo. Puedes descargarlo primero con `wget` e inspeccionarlo.
+
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered)
 ```
@@ -864,7 +881,7 @@ sudo systemctl enable nodered
 sudo systemctl start nodered
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 sudo systemctl status nodered
 # Dashboard en http://localhost:1880
@@ -879,15 +896,17 @@ sudo apt install -y python3 python3-pip
 
 #### Paso 2: Actualiza Pip
 ```bash
-pip3 install --upgrade pip
+pip3 install --upgrade pip --break-system-packages
 ```
 
 #### Paso 3: Instala Bibliotecas
+> **Nota:** Se usa `--break-system-packages` para instalar a nivel de sistema, permitiendo acceso directo desde cualquier script Python sin necesidad de entornos virtuales.
+
 ```bash
-pip3 install pandas numpy scikit-learn paho-mqtt ultralytics
+pip3 install --break-system-packages pandas numpy scikit-learn paho-mqtt ultralytics
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 python3 -c "import pandas, numpy, sklearn; print('Bibliotecas OK')"
 # Debería imprimir sin errores
@@ -901,19 +920,19 @@ Si usas firewall, abre puertos:
 | MongoDB | 27017 | TCP | `sudo ufw allow 27017/tcp` |
 | Node-RED | 1880 | TCP | `sudo ufw allow 1880/tcp` |
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 sudo ufw status
 ```
 
 ### Tips Generales
 - Usa entornos virtuales: `python3 -m venv ml_env && source ml_env/bin/activate`.
-- Actualiza bibliotecas: `pip3 install --upgrade <lib>`.
+- Actualiza bibliotecas: `pip3 install --break-system-packages --upgrade <lib>`.
 
 ### Troubleshooting
 - **MongoDB auth falla:** Verifica config en `/etc/mongod.conf`.
 - **Node-RED no inicia:** Revisa logs: `sudo journalctl -u nodered`.
-- **Pip instala lento:** Usa mirror: `pip3 install --index-url https://pypi.org/simple <lib>`.
+- **Pip instala lento:** Usa mirror: `pip3 install --break-system-packages --index-url https://pypi.org/simple <lib>`.
 
 > **Recursos Adicionales:**
 > * [Node-RED Docs](https://nodered.org/docs/)
@@ -947,7 +966,7 @@ sudo systemctl set-default multi-user.target
 sudo reboot
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 systemctl get-default  # multi-user.target
 # No verás entorno gráfico al bootear
@@ -967,7 +986,7 @@ sudo systemctl set-default graphical.target
 sudo reboot
 ```
 
-**Verificación:**
+**Verificación (opcional):**
 ```bash
 systemctl get-default  # graphical.target
 # Deberías ver login gráfico
@@ -1007,7 +1026,7 @@ lspci | grep RTL8125  # Confirma chip
 5. Actualiza initramfs: `sudo update-initramfs -u`
 6. Reinicia: `sudo reboot`
 
-**Verificación:** `ip link show` (debería estar UP), `lspci | grep -i ethernet`
+**Verificación (opcional):** `ip link show` (debería estar UP), `lspci | grep -i ethernet`
 
 ### Problemas con Intel Ethernet (ej. I219, I225)
 
@@ -1022,7 +1041,7 @@ dmesg | grep e1000e  # Errores?
 2. O usa PPA: `sudo add-apt-repository ppa:canonical-hwe-team/backport-iwlwifi -y && sudo apt update && sudo apt install backport-iwlwifi-dkms`
 3. Reinicia: `sudo reboot`
 
-**Verificación:** `ip a` (IP asignada), `ping 8.8.8.8`
+**Verificación (opcional):** `ip a` (IP asignada), `ping 8.8.8.8`
 
 ### Problemas con Wi-Fi (Broadcom, etc.)
 
@@ -1036,7 +1055,7 @@ lspci | grep Network  # Identifica chip
 1. Instala bcmwl: `sudo apt install bcmwl-kernel-source`
 2. Reinicia: `sudo reboot`
 
-**Verificación:** `iwconfig` (debería mostrar wlan0 UP)
+**Verificación (opcional):** `iwconfig` (debería mostrar wlan0 UP)
 
 ### DNS No Resuelve Nombres
 
@@ -1051,7 +1070,7 @@ cat /etc/resolv.conf  # Nameservers
 2. Agrega: `nameserver 8.8.8.8` y `nameserver 1.1.1.1`
 3. O usa systemd: `sudo systemctl restart systemd-resolved`
 
-**Verificación:** `nslookup google.com` (debería resolver)
+**Verificación (opcional):** `nslookup google.com` (debería resolver)
 
 ### Conexión Lenta o Intermitente
 
@@ -1066,7 +1085,7 @@ dmesg | grep -i network  # Errores
 2. Aplica: `sudo sysctl -p`
 3. Cambia MTU: `sudo ip link set dev enpXsY mtu 1450`
 
-**Verificación:** `speedtest-cli`, reinicia y testea.
+**Verificación (opcional):** `speedtest-cli`, reinicia y testea.
 
 ### Configurar IP Estática
 
@@ -1080,13 +1099,16 @@ dmesg | grep -i network  # Errores
        enp0s3:
          dhcp4: no
          addresses: [192.168.1.100/24]
-         gateway4: 192.168.1.1
+         routes:
+           - to: default
+             via: 192.168.1.1
          nameservers:
            addresses: [8.8.8.8, 1.1.1.1]
    ```
+   > **Nota:** `gateway4` está deprecado desde Netplan 0.105+. Usa `routes` como se muestra arriba.
 3. Aplica: `sudo netplan apply`
 
-**Verificación:** `ip a` (IP estática), `ping google.com`
+**Verificación (opcional):** `ip a` (IP estática), `ping google.com`
 
 ### Problemas con VPN
 
@@ -1101,7 +1123,7 @@ journalctl -u openvpn  # Logs
 2. Conecta: `sudo openvpn config.ovpn`
 3. Para WireGuard: `sudo apt install wireguard` y configura.
 
-**Verificación:** `ip a` (tun interface), `curl ifconfig.me` (IP externa cambia)
+**Verificación (opcional):** `ip a` (tun interface), `curl ifconfig.me` (IP externa cambia)
 
 ### Troubleshooting General
 - **No conecta:** `sudo systemctl restart NetworkManager`
@@ -1149,7 +1171,7 @@ journalctl -u openvpn  # Logs
    ```
    Habilita: `sudo systemctl enable wol`
 
-**Verificación:** Apaga el PC, espera 1 min, envía paquete desde otro dispositivo.
+**Verificación (opcional):** Apaga el PC, espera 1 min, envía paquete desde otro dispositivo.
 
 ### Enviar Paquete WOL desde Windows (a Windows o Ubuntu)
 
@@ -1196,7 +1218,7 @@ wakeonlan -i 192.168.1.255 AA:BB:CC:DD:EE:FF  # Broadcast IP de tu red
 sudo etherwake -i enpXsY AA:BB:CC:DD:EE:FF
 ```
 
-**Verificación:** Usa Wireshark/tcpdump para ver paquete: `sudo tcpdump -i enpXsY port 9`
+**Verificación (opcional):** Usa Wireshark/tcpdump para ver paquete: `sudo tcpdump -i enpXsY port 9`
 
 ### Troubleshooting
 - **No despierta:** Verifica BIOS, cable Ethernet, firewall bloquea puerto 9.
@@ -1220,19 +1242,23 @@ Incluye dependencias adicionales y opciones.
 # Script para la preparación inicial del sistema Ubuntu
 # Versión mejorada con más herramientas
 
-set -e  # Salir en error
+set -euo pipefail  # Salir en error, variables no definidas, y fallos en pipes
 
 echo "--- Actualizando el sistema ---"
 sudo apt update && sudo apt upgrade -y
 
 echo "--- Instalando dependencias comunes ---"
-sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors neofetch
+sudo apt install -y build-essential dkms pkg-config libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev libxmu-dev libxi-dev libglu1-mesa-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev mesa-utils inxi net-tools openssh-server curl git wget htop ncdu tree traceroute nmap vim lm-sensors fastfetch
 
 echo "--- Configurando GDM3 (desactivar Wayland) ---"
-sudo sed -i 's/#WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
+if [ -f /etc/gdm3/custom.conf ]; then
+  sudo sed -i 's/#WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
+else
+  echo "Archivo /etc/gdm3/custom.conf no encontrado. Omitiendo configuración de Wayland."
+fi
 
 echo "--- Configurando firewall (opcional) ---"
-read -p "¿Habilitar UFW con SSH? (s/n): " ufw_choice
+read -r -p "¿Habilitar UFW con SSH? (s/n): " ufw_choice
 if [[ $ufw_choice =~ ^[sS]$ ]]; then
   sudo ufw allow ssh
   sudo ufw --force enable
@@ -1244,7 +1270,7 @@ echo "Git versión: $(git --version)"
 echo "Firewall status: $(sudo ufw status | head -1)"
 
 echo "--- Preparación completada. Reinicio recomendado. ---"
-read -p "¿Reiniciar ahora? (s/n): " choice
+read -r -p "¿Reiniciar ahora? (s/n): " choice
 case "$choice" in
   s|S ) sudo reboot;;
   * ) echo "Ejecuta 'sudo reboot' manualmente.";;
@@ -1269,7 +1295,113 @@ esac
 
 ---
 
-## 12. Buenas Prácticas de Seguridad (Opcional)
+## 12. Scripts Doctor de Verificación
+
+> **Nota:** Los scripts doctor permiten verificar que todos los componentes de una estación estén instalados correctamente y, opcionalmente, instalar los faltantes de forma automática. Existen dos variantes según el tipo de estación.
+
+### Archivos
+
+| Archivo | Descripción |
+|---------|-------------|
+| `doctor_lib.sh` | Librería compartida con funciones de verificación, instalación y resumen. No se ejecuta directamente. |
+| `doctor_compresion.sh` | Verifica e instala componentes para estaciones de **compresión** (secciones 3-6). |
+| `doctor_analitica.sh` | Verifica e instala componentes para estaciones de **analítica** (secciones 3-5 y 7). |
+
+### Uso Básico
+
+#### Solo verificar (sin instalar nada)
+```bash
+chmod +x doctor_compresion.sh doctor_analitica.sh doctor_lib.sh
+./doctor_compresion.sh      # Para estaciones de compresión
+./doctor_analitica.sh       # Para estaciones de analítica
+```
+
+#### Verificar e instalar faltantes automáticamente
+```bash
+./doctor_compresion.sh --fix
+./doctor_analitica.sh --fix
+```
+
+Con `--fix` el script:
+1. Solicita `sudo` una sola vez al inicio.
+2. Ejecuta `apt update` una sola vez.
+3. Para cada check que falla, intenta instalar el componente y re-verifica.
+4. Genera un log completo en `/tmp/doctor_fix_YYYYMMDD_HHMMSS.log`.
+
+### Flujo Recomendado
+
+```
+1. Ejecutar el script sin --fix para diagnosticar
+             │
+             ▼
+2. ¿Hay fallos en NVIDIA Driver o CUDA?
+   ├─ SÍ → Instalar manualmente (secciones 4 y 5 de esta guía)
+   └─ NO → Continuar
+             │
+             ▼
+3. Ejecutar con --fix para instalar el resto automáticamente
+             │
+             ▼
+4. Verificar resumen final
+   ├─ Todo OK → Listo
+   └─ Aún hay fallos → Revisar /tmp/doctor_fix_*.log
+```
+
+> **Importante:** Los drivers NVIDIA y CUDA Toolkit requieren instalación manual (reboot, modo texto, configuración de PATH). El script los detecta pero no los instala automáticamente; en su lugar muestra instrucciones para seguir las secciones correspondientes de esta guía.
+
+### Niveles de Severidad
+
+Los scripts clasifican los resultados en distintos niveles para facilitar la priorización:
+
+| Tag | Nivel | Descripción | Ejemplo |
+|-----|-------|-------------|---------|
+| `[OK]` | Correcto | Componente instalado y funcionando | build-essential, nvidia-smi, MongoDB |
+| `[FALLO]` | Crítico | Componente esencial faltante | Paquetes del sistema, drivers, CUDA |
+| `[AVISO]` | Aviso crítico | Componente opcional importante ausente | cuDNN, servicios no iniciados, herramientas remotas |
+| `[NOTA]` | Menor | Configuración opcional no aplicada | Puertos de firewall no configurados |
+| `[INFO]` | Informativo | Datos del sistema detectados | Versión de GPU, kernel, IP |
+
+En el resumen:
+- **SALUDABLE:** 0 fallos y 0 avisos. Las notas menores no afectan el estado.
+- **SALUDABLE CON AVISOS:** 0 fallos, pero hay avisos críticos pendientes.
+- **ATENCIÓN REQUERIDA:** 1-3 fallos.
+- **REQUIERE INTERVENCIÓN:** Más de 3 fallos.
+
+### Qué Verifica Cada Script
+
+#### Componentes comunes (ambos scripts)
+- Sistema operativo (Ubuntu, kernel, arquitectura)
+- Dependencias de desarrollo (build-essential, dkms, GCC, librerías OpenGL/Mesa/GStreamer)
+- Herramientas de calidad de vida (git, curl, wget, vim, htop, ncdu, nmap, etc.)
+- Entorno gráfico (Xorg vs Wayland)
+- SSH y firewall
+- Drivers NVIDIA (nvidia-smi, módulos kernel, detección GPU)
+- CUDA Toolkit (nvcc, PATH, LD_LIBRARY_PATH, configuración en sistema)
+
+#### Solo compresión (`doctor_compresion.sh`)
+- MongoDB y MongoDB Compass
+- EMQX (broker MQTT)
+- Golang y Visual Studio Code
+- GStreamer y todos sus plugins (base, good, bad, ugly, libav, RTSP, NVIDIA, etc.)
+- Herramientas remotas (Angry IP Scanner, AnyDesk, RustDesk)
+- Puertos: 27017 (MongoDB), 1883 (MQTT), 18083 (EMQX Dashboard)
+
+#### Solo analítica (`doctor_analitica.sh`)
+- MongoDB con verificación de autorización
+- Node-RED, Node.js y npm
+- Python 3, pip3 y bibliotecas ML (pandas, numpy, scikit-learn, paho-mqtt, ultralytics)
+- Puertos: 27017 (MongoDB), 1880 (Node-RED)
+
+### Troubleshooting
+- **El script falla al iniciar:** Verifica que `doctor_lib.sh` esté en el mismo directorio.
+- **`--fix` no instala algo:** Revisa el log en `/tmp/doctor_fix_*.log` para ver el error exacto.
+- **Paquete Python no detectado:** El script usa `pip3 show` para verificar, que es más robusto que `import`. Si falla, verifica con `pip3 list | grep <paquete>`.
+- **NVIDIA módulo no detectado:** El script verifica vía `lsmod`, `/proc/driver/nvidia/version` y `nvidia-smi` como fallback. Si todo falla, revisa que el driver esté instalado correctamente.
+- **CUDA no detectado:** El script busca `nvcc` en `/usr/local/cuda*/bin/` y también verifica configuración en `~/.bashrc`, `/etc/profile.d/` y `/etc/environment`.
+
+---
+
+## 13. Buenas Prácticas de Seguridad (Opcional)
 
 > **Nota:** Estas medidas fortalecen Ubuntu, especialmente para acceso remoto. Aplica solo lo necesario; más seguridad puede complicar uso.
 
@@ -1283,7 +1415,7 @@ Reduce escaneo de bots.
 3. Reinicia SSH: `sudo systemctl restart ssh`
 4. Firewall: `sudo ufw allow 2222/tcp && sudo ufw delete allow 22/tcp`
 
-**Verificación:** `ss -tlnp | grep 2222`
+**Verificación (opcional):** `ss -tlnp | grep 2222`
 
 #### Autenticación por Clave SSH
 Deshabilita passwords.
@@ -1293,7 +1425,7 @@ Deshabilita passwords.
 3. Deshabilita password: `sudo nano /etc/ssh/sshd_config` > `PasswordAuthentication no`
 4. Reinicia: `sudo systemctl restart ssh`
 
-**Verificación:** Intenta login con password (debe fallar).
+**Verificación (opcional):** Intenta login con password (debe fallar).
 
 #### Deshabilitar Root Login
 Previene acceso directo como root.
@@ -1310,16 +1442,17 @@ Bloquea IPs con intentos fallidos.
 2. Habilita: `sudo systemctl enable fail2ban`
 3. Config: `sudo nano /etc/fail2ban/jail.local` (ej. `[sshd]` con `port = 2222`)
 
-**Verificación:** `sudo fail2ban-client status sshd`
+**Verificación (opcional):** `sudo fail2ban-client status sshd`
 
 #### Actualizaciones Automáticas
 Mantén sistema seguro.
 
 1. Instala unattended-upgrades: `sudo apt install unattended-upgrades`
 2. Config: `sudo dpkg-reconfigure unattended-upgrades`
-3. O cron: `sudo crontab -e` > `0 2 * * * apt update && apt upgrade -y`
+3. O cron (solo para actualizaciones de seguridad): `sudo crontab -e` > `0 2 * * * apt update && apt upgrade -y`
+   > **Advertencia:** No usar `apt upgrade -y` automático en producción con drivers NVIDIA. Una actualización de kernel puede romper los módulos NVIDIA. Prefiere `unattended-upgrades` que maneja esto mejor.
 
-**Verificación:** `sudo unattended-upgrades --dry-run`
+**Verificación (opcional):** `sudo unattended-upgrades --dry-run`
 
 ### Otras Prácticas
 
@@ -1445,6 +1578,8 @@ Ejecuta: `chmod +x identify_gpu.sh && ./identify_gpu.sh`
 
 # NVIDIA GeForce RTX Serie 5000 - Identificación PCI (Blackwell)
 
+> **Nota:** Estos Device IDs son preliminares y pueden variar según la revisión del hardware. Verifica con `lspci -nn | grep VGA` en tu equipo.
+
 | Serie | Modelo      | Device ID (hex) |
 | ----- | ----------- | --------------- |
 | 5000  | RTX 5090    | 2B80            |
@@ -1487,7 +1622,7 @@ uname -r  # Versión kernel (ej. 6.8.0-40-generic)
 gcc --version | head -1  # Versión GCC (ej. gcc 11.4.0)
 ```
 
-### Compatibilidad Recomendada (Noviembre 2025)
+### Compatibilidad Recomendada (Marzo 2026)
 Basado en NVIDIA docs. Usa la versión más reciente compatible con tu GPU (series 3000/4000/5000).
 
 #### Drivers NVIDIA y GPUs
@@ -1534,7 +1669,7 @@ Basado en NVIDIA docs. Usa la versión más reciente compatible con tu GPU (seri
 ### Tips Generales
 - **Instala en orden:** Drivers → CUDA → cuDNN → Bibliotecas (cuBLAS, etc.).
 - **Prueba con samples:** Después de instalar, ejecuta CUDA samples: `cd /usr/local/cuda/samples && make && ./bin/x86_64/linux/release/deviceQuery`.
-- **Si usas Docker:** Usa imágenes NVIDIA: `nvidia-docker run --rm nvidia/cuda:12.8-base-ubuntu24.04 nvidia-smi`.
+- **Si usas Docker:** Usa imágenes NVIDIA: `nvidia-docker run --rm nvidia/cuda:12.8-base|-ubuntu24.04 nvidia-smi`.
 - **Backup antes de cambios:** Crea snapshot o backup de drivers.
 
 > **Recursos Adicionales:**
