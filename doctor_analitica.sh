@@ -72,7 +72,7 @@ check_and_fix "nmap instalado" "command -v nmap" "fix_apt nmap"
 check_and_fix "inxi instalado" "command -v inxi" "fix_apt inxi"
 check_and_fix "net-tools instalado" "command -v ifconfig" "fix_apt net-tools"
 check_and_fix "lm-sensors instalado" "command -v sensors" "fix_apt lm-sensors"
-check_and_fix "fastfetch instalado" "command -v fastfetch" "fix_fastfetch"
+check_and_fix "neofetch instalado" "command -v neofetch" "fix_neofetch"
 check_and_fix "mesa-utils instalado" "command -v glxinfo" "fix_apt mesa-utils"
 
 check_and_fix "Librerías OpenGL (libglvnd-dev)" \
@@ -188,8 +188,8 @@ if command -v nvcc > /dev/null 2>&1; then
     info "CUDA: ${cuda_version}"
 fi
 
-check_and_fix "PATH incluye CUDA" "echo \$PATH | grep -qi cuda"
-check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \${LD_LIBRARY_PATH:-} | grep -qi cuda"
+check_and_fix "PATH incluye CUDA" "echo \"\$PATH\" | grep -qi cuda"
+check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \"\${LD_LIBRARY_PATH:-}\" | grep -qi cuda"
 check_and_fix "Configuración CUDA en el sistema" "check_cuda_configured"
 
 check_and_fix_warn "cuDNN instalado" "dpkg -l 2>/dev/null | grep -qi cudnn"

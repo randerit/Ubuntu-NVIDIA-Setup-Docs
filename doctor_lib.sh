@@ -238,8 +238,8 @@ check_cuda_configured() {
     ls /etc/profile.d/cuda*.sh > /dev/null 2>&1 && return 0
     # Verificar en /etc/environment
     grep -qi 'cuda' /etc/environment 2>/dev/null && return 0
-    # Verificar si ya está en el PATH del sistema
-    command -v nvcc > /dev/null 2>&1 && return 0
+    # Verificar en /etc/profile
+    grep -qi 'cuda' /etc/profile 2>/dev/null && return 0
     return 1
 }
 
@@ -403,11 +403,9 @@ fix_nodered_service() {
     sudo systemctl enable nodered && sudo systemctl start nodered
 }
 
-# --- Fastfetch (requiere PPA) ---
-fix_fastfetch() {
-    sudo add-apt-repository -y ppa:zhangsongcui3371/fastfetch && \
-    sudo apt-get update && \
-    sudo apt-get install -y fastfetch
+# --- Neofetch ---
+fix_neofetch() {
+    sudo apt-get install -y neofetch
 }
 
 # --- libtinfo5 para Ubuntu 24.04 ---
