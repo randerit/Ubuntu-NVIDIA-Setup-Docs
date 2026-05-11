@@ -192,8 +192,6 @@ check_and_fix "PATH incluye CUDA" "echo \"\$PATH\" | grep -qi cuda"
 check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \"\${LD_LIBRARY_PATH:-}\" | grep -qi cuda"
 check_and_fix "Configuración CUDA en el sistema" "check_cuda_configured"
 
-check_and_fix_warn "cuDNN instalado" "dpkg -l 2>/dev/null | grep -qi cudnn"
-
 # --- 7. MongoDB (Sección 6) ---
 section "7. MongoDB"
 
@@ -328,31 +326,31 @@ check_and_fix "Resolución DNS" "host google.com"
 if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
     info "Verificando reglas de firewall..."
     check_and_fix_minor "Puerto SSH (22) configurado" \
-        "sudo ufw status | grep -q '22'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])22(/|[^0-9]|\$)'" \
         "sudo ufw allow ssh"
     check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "sudo ufw status | grep -q '27017'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)'" \
         "sudo ufw allow 27017/tcp"
     check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
-        "sudo ufw status | grep -q '1883'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)'" \
         "sudo ufw allow 1883/tcp"
     check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
-        "sudo ufw status | grep -q '18083'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)'" \
         "sudo ufw allow 18083/tcp"
     check_and_fix_minor "Puerto GStreamer RTSP (554) configurado" \
-        "sudo ufw status | grep -q '554'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])554(/|[^0-9]|\$)'" \
         "sudo ufw allow 554/tcp && sudo ufw allow 554/udp"
     check_and_fix_minor "Puerto AnyDesk HTTP (80) configurado" \
-        "sudo ufw status | grep -q '80'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])80(/|[^0-9]|\$)'" \
         "sudo ufw allow 80/tcp"
     check_and_fix_minor "Puerto AnyDesk HTTPS (443) configurado" \
-        "sudo ufw status | grep -q '443'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])443(/|[^0-9]|\$)'" \
         "sudo ufw allow 443/tcp"
     check_and_fix_minor "Puerto AnyDesk (6568) configurado" \
-        "sudo ufw status | grep -q '6568'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])6568(/|[^0-9]|\$)'" \
         "sudo ufw allow 6568/tcp"
     check_and_fix_minor "Puerto AnyDesk UDP (50001-50003) configurado" \
-        "sudo ufw status | grep -q '50001'" \
+        "sudo ufw status | grep -qE '(^|[^0-9])50001(/|[^0-9]|\$|:)'" \
         "sudo ufw allow 50001:50003/udp"
 else
     info "UFW no activo, omitiendo verificación de puertos"
@@ -372,4 +370,4 @@ fi
 
 # =============================================================================
 print_summary "compresión"
-exit "$failed"
+exit $((failed > 255 ? 1 : failed))
