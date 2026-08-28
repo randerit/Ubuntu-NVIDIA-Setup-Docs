@@ -294,9 +294,10 @@ check_cuda_version() {
     [ "$v" = "$CUDA_VERSION_EXPECTED" ]
 }
 
-# Pin del kernel GA persistente (Sección 3 Paso 7 / Sección 14). Verificar solo
-# "uname -r" no alcanza: un equipo en 6.8 sin pin vuelve al HWE en el próximo
-# apt upgrade y se queda sin base de datos.
+# Pin del kernel persistente (Sección 3 Paso 7 / Sección 14). Verificar solo
+# "uname -r" no alcanza: un equipo en un kernel compatible (cualquiera anterior
+# a 6.19) pero sin pin salta al HWE 7.0 en el próximo apt upgrade y se queda sin
+# base de datos.
 check_kernel_pin() {
     [ -f /etc/apt/preferences.d/99-no-hwe-kernel ] || return 1
     [ -f /etc/apt/apt.conf.d/51-block-hwe-kernel ] || return 1
@@ -438,9 +439,14 @@ detect_cuda_from_system() {
 # =============================================================================
 
 # Verificar si NVIDIA está funcionando en el kernel (módulos open o propietarios)
+# Nada de "lsmod | grep -qi": lsmod son ~10 KB, grep -q sale al primer match,
+# lsmod muere con SIGPIPE al escribir el resto y pipefail propaga el 141. El
+# módulo está cargado y la respuesta es "no". Se captura en variable.
 check_nvidia_kernel_module() {
+    local mods
+    mods=$(lsmod 2>/dev/null || true)
     # Verificar módulos clásicos y open
-    lsmod 2>/dev/null | grep -qi 'nvidia' && return 0
+    grep -qi 'nvidia' <<<"$mods" && return 0
     # Verificar vía /proc (funciona con módulos open y propietarios)
     [ -f /proc/driver/nvidia/version ] && return 0
     # Verificar si nvidia-smi funciona (prueba definitiva)
@@ -449,11 +455,19 @@ check_nvidia_kernel_module() {
 }
 
 # Verificar si hay GPU NVIDIA en el sistema
+# Se lee sysfs y no "lspci | grep -qi nvidia": ese pipeline responde "no hay
+# GPU" en cuanto lspci escribe más de un bloque de 4 KB (equipos con muchos
+# dispositivos PCI) por el SIGPIPE que provoca grep -q. Sysfs además no depende
+# de que lspci esté en el PATH ni de que pci.ids conozca el modelo: vendor
+# 0x10de es NVIDIA y ya.
+# shellcheck disable=SC2120  # el self-check le pasa una raíz alternativa
 check_nvidia_gpu() {
-    # Verificar vía lspci (puede no estar en PATH)
-    lspci 2>/dev/null | grep -qi 'nvidia\|GeForce\|Quadro\|Tesla' && return 0
-    /usr/bin/lspci 2>/dev/null | grep -qi 'nvidia\|GeForce\|Quadro\|Tesla' && return 0
-    /sbin/lspci 2>/dev/null | grep -qi 'nvidia\|GeForce\|Quadro\|Tesla' && return 0
+    # $1: raíz alternativa para los self-checks; vacío = el sistema real
+    local root="${1:-}" f
+    for f in "$root"/sys/bus/pci/devices/*/vendor; do
+        [ -r "$f" ] || continue
+        [ "$(cat "$f")" = "0x10de" ] && return 0
+    done
     # Fallback: si nvidia-smi funciona, hay GPU
     nvidia-smi > /dev/null 2>&1 && return 0
     return 1
@@ -467,6 +481,9 @@ check_nvidia_gpu() {
 # El guard de MongoDB lee el string de uname, no el sublevel upstream real, así que
 # comparamos exactamente lo mismo que mira MongoDB. Ver Sección 14 del README.
 # ponytail: dpkg --compare-versions en vez de parseo propio de versiones
+# Compatible es cualquier kernel anterior a 6.19, no solo el GA 6.8: los HWE
+# 6.11, 6.14 y 6.17 arrancan mongod igual, y Mint 22.2 viene con 6.14. Un equipo
+# ahí no se baja a 6.8; lo que hace falta es el pin para que no suba.
 check_kernel_mongodb_ok() {
     local kver="${1:-$(uname -r)}"
     kver="${kver%%-*}"                                  # 7.0.0-28-generic -> 7.0.0
@@ -498,8 +515,40 @@ fix_apt() {
     sudo apt-get install -y --no-upgrade "$@"
 }
 
+# Quitar el bloqueo de snapd de Linux Mint
+# Mint trae /etc/apt/preferences.d/nosnap.pref con Pin-Priority negativa: apt
+# deja snapd sin candidato y cualquier "snap install" muere con un "command not
+# found" que no explica nada. Se respalda el archivo antes de sacarlo, así que
+# revertir es un mv. Las rutas son variables para que el self-check las apunte a
+# una raíz falsa.
+NOSNAP_PREF="${NOSNAP_PREF:-/etc/apt/preferences.d/nosnap.pref}"
+NOSNAP_BACKUP="${NOSNAP_BACKUP:-/var/backups/nosnap.pref.bak}"
+
+unblock_snapd() {
+    [ -f "$NOSNAP_PREF" ] || return 0
+    sudo install -d -m 755 "$(dirname "$NOSNAP_BACKUP")"
+    if ! sudo cp -a "$NOSNAP_PREF" "$NOSNAP_BACKUP"; then
+        echo "    No se pudo respaldar $NOSNAP_PREF; no se toca la política de snapd."
+        return 1
+    fi
+    sudo rm -f "$NOSNAP_PREF"
+    # El pin cambió: sin releer índices, snapd sigue sin candidato.
+    sudo apt-get update >/dev/null 2>&1 || true
+    echo "    Política nosnap.pref quitada (copia en $NOSNAP_BACKUP)."
+    echo "    Para volver a bloquear snapd:  sudo mv $NOSNAP_BACKUP $NOSNAP_PREF"
+}
+
 # Instalar paquete snap
 fix_snap() {
+    # Si la distro bloquea snapd (Mint), primero se saca el bloqueo y se instala
+    # snapd; recién después tiene sentido el snap install.
+    unblock_snapd || return 1
+    if ! command -v snap >/dev/null 2>&1; then
+        sudo apt-get install -y --no-upgrade snapd || {
+            echo "    No se pudo instalar snapd. Instalá $1 por apt, .deb oficial o tarball."
+            return 1
+        }
+    fi
     sudo snap install "$1" --classic
 }
 
@@ -517,10 +566,54 @@ fix_pip() {
     pip3 install --break-system-packages "$@"
 }
 
+# --- Base de Ubuntu (Linux Mint y otros derivados directos) ---
+# Mint 22.x es noble reempaquetado, pero lsb_release contesta "Linuxmint" y
+# "22.1": ese numero no es una version de Ubuntu, y "lsb_release -cs" devuelve
+# el codename de Mint (wilma, xia), que no existe en los repos de terceros. La
+# base real esta en /etc/upstream-release/lsb-release, y como respaldo en el
+# UBUNTU_CODENAME de /etc/os-release.
+ubuntu_base_version() {
+    # $1: raíz alternativa para los self-checks; vacío = el sistema real
+    local root="${1:-}" id="" ver="" codename="" up_id up_rel
+    if [ -r "$root/etc/os-release" ]; then
+        id=$(. "$root/etc/os-release" 2>/dev/null; echo "${ID:-}")
+        ver=$(. "$root/etc/os-release" 2>/dev/null; echo "${VERSION_ID:-}")
+        codename=$(. "$root/etc/os-release" 2>/dev/null; echo "${UBUNTU_CODENAME:-}")
+    fi
+    if [ "$id" = "ubuntu" ] && [ -n "$ver" ]; then
+        echo "$ver"
+        return 0
+    fi
+    if [ -r "$root/etc/upstream-release/lsb-release" ]; then
+        up_id=$(awk -F= '$1 == "DISTRIB_ID" {print tolower($2)}' "$root/etc/upstream-release/lsb-release")
+        up_rel=$(awk -F= '$1 == "DISTRIB_RELEASE" {print $2}' "$root/etc/upstream-release/lsb-release")
+        if [ "$up_id" = "ubuntu" ] && [ -n "$up_rel" ]; then
+            echo "$up_rel"
+            return 0
+        fi
+    fi
+    case "$codename" in
+        noble) echo "24.04"; return 0 ;;
+        jammy) echo "22.04"; return 0 ;;
+    esac
+    return 1
+}
+
+# shellcheck disable=SC2120  # el self-check le pasa una raíz alternativa
+ubuntu_base_codename() {
+    case "$(ubuntu_base_version "$@" 2>/dev/null)" in
+        24.04*) echo "noble" ;;
+        22.04*) echo "jammy" ;;
+        *) return 1 ;;
+    esac
+}
+
 # --- Repositorio MongoDB ---
 fix_mongodb_repo_and_install() {
     local codename
-    codename=$(lsb_release -cs 2>/dev/null || echo "noble")
+    # Nunca lsb_release -cs: en Mint devuelve wilma/xia y la URL de MongoDB no
+    # existe con ese codename.
+    codename=$(ubuntu_base_codename || echo "noble")
     curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-8.0.gpg 2>/dev/null
     echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${codename}/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list > /dev/null
     sudo apt-get update && sudo apt-get install -y mongodb-org

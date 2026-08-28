@@ -194,7 +194,12 @@ xid_in_list() {
 }
 
 # 1a. ¿Existe fisicamente un dispositivo 10ec:8125? (puede haber mas de uno)
-if lspci -n | grep -qi '10ec:8125'; then
+# Capturado en variable, nunca "lspci -n | grep -qi": grep -q sale al primer
+# match, lspci muere con SIGPIPE al escribir el resto y con pipefail el gate da
+# "no hay NIC Realtek". En ese camino el equipo reinicia al 6.8 sin r8125: sin
+# red y sin nadie mirando.
+LSPCI_N=$(lspci -n 2>/dev/null || true)
+if grep -qi '10ec:8125' <<<"$LSPCI_N"; then
     PCI_ADDRS=$(lspci -Dn | grep -i '10ec:8125' | awk '{print $1}' | tr '\n' ' ')
     log "Detectado(s) NIC(s) 10ec:8125 en: $PCI_ADDRS"
 
@@ -1175,7 +1180,7 @@ run "grub-reboot '$GRUB_ENTRY'"
 log ""
 log "================================================================"
 log "COMPLETADO. Estado:"
-if lspci -n | grep -qi '10ec:8125'; then
+if grep -qi '10ec:8125' <<<"$(lspci -n 2>/dev/null || true)"; then
     # Por archivo y con validacion de version, nunca 'modinfo -k <kver> r8125':
     # por nombre da falsos negativos en arboles solo-DKMS, y sin mirar version
     # el r8125-dkms 9.011.00 de noble pasaba por bueno.

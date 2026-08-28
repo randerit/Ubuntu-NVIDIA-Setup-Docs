@@ -66,6 +66,36 @@ Confirm these points before installing Ubuntu:
 - If the machine will be managed remotely, you can still start with **Ubuntu Desktop** and disable the graphical interface later.
 - If you need dual boot with Windows, do not use the simple path in this section; it requires manual partitioning.
 
+### Ubuntu and direct derivatives (Linux Mint)
+
+This manual targets Ubuntu LTS, and it also applies to direct derivatives that repackage
+Ubuntu without changing the base: **Linux Mint 21.x (22.04 base)** and **Linux Mint 22.x
+(24.04 base)**. What matters is the base, not the distro's own version number: Mint 22.1 is not
+Ubuntu 22.04, it is Ubuntu 24.04 repackaged. Check the base with:
+
+```bash
+cat /etc/upstream-release/lsb-release
+```
+
+It must say `DISTRIB_ID=Ubuntu` and `DISTRIB_RELEASE=24.04` (or `22.04`). If the file is
+missing, read `UBUNTU_CODENAME` from `/etc/os-release` (`noble` = 24.04, `jammy` = 22.04).
+
+> **Never use `lsb_release -cs` on a derivative.** On Mint it returns Mint's own codename
+> (`wilma`, `xia`, `virginia`), which does not exist in the Ubuntu, NVIDIA, MongoDB or EMQX
+> repositories: any repo built from that value returns 404. Always use `noble` or `jammy`,
+> whichever matches the base.
+
+Three Mint differences that do change steps in this manual:
+
+| Difference | What it means |
+|-----------|---------------|
+| `/etc/apt/preferences.d/nosnap.pref` blocks `snapd` | With that pin (`-10`) `apt` leaves `snapd` with no candidate, so the snap steps (Go, VS Code) cannot run. To enable them: `sudo cp -a /etc/apt/preferences.d/nosnap.pref /var/backups/nosnap.pref.bak && sudo rm /etc/apt/preferences.d/nosnap.pref && sudo apt-get update`. Reverting is a `mv` of the backup. Installers 2.5.0+ and `workstation-doctor-compresion --fix` do this on their own, unless `--skip-snaps` is given. |
+| The session manager is LightDM, not GDM | `/etc/gdm3/custom.conf` tweaks (such as disabling Wayland) do not apply: Mint already runs X11 with Cinnamon. To turn the graphical interface off, use `lightdm` instead of `gdm3`. |
+| Mint's Update Manager offers kernels | If you pinned the kernel because of MongoDB 8, do not install kernels from there; the `apt` pin does not cover anything installed by hand. The 6.14 that ships with Mint 22.2 is compatible and does **not** need to go down to 6.8. |
+
+LMDE (Linux Mint Debian Edition) is **not** supported: its base is Debian, not Ubuntu, and the
+installers reject it.
+
 ---
 
 ## 2. Ubuntu System Installation
@@ -341,6 +371,10 @@ First check your version:
 lsb_release -rs
 ```
 
+> **On Linux Mint** this command returns Mint's version (for example `22.1`), not Ubuntu's.
+> The base is what counts: read it from `/etc/upstream-release/lsb-release` and apply the
+> adjustments for that version.
+
 For **Ubuntu 22.04 LTS**, install GCC/G++ 12 if you will use CUDA versions that require it:
 
 ```bash
@@ -396,6 +430,23 @@ apt-cache policy linux-image-generic       # expected: 500 / 6.8.0-1XX.XXX  <- m
 > **If `uname -r` already shows `7.0.0-XX`**, the machine was born with HWE installed and this
 > pinning only stops it from getting worse: the 7.0 still has to be purged. Do not continue with
 > MongoDB; go to [Section 14, Case A](#case-a--machine-already-deployed-running-kernel-70).
+
+> **If `uname -r` shows 6.9 – 6.18, do not take it down to 6.8.** MongoDB 8's ceiling is 6.19:
+> every kernel below that starts `mongod` fine. The `6.11` from a 24.04.2 ISO, the `6.14` from a
+> 24.04.3 and the `6.14` that ships with Linux Mint 22.2 are already compatible, and downgrading
+> them to 6.8 gives up hardware support without fixing anything. Apply the pinning anyway: noble's
+> HWE points at 7.0 today, so without the pin the next `apt full-upgrade` does break MongoDB. And
+> when you purge the HWE metapackages, mark the running kernel manual so no `autoremove` takes it:
+>
+> ```bash
+> sudo apt-mark manual linux-image-$(uname -r) linux-modules-$(uname -r) \
+>                      linux-modules-extra-$(uname -r) linux-headers-$(uname -r)
+> ```
+>
+> GA 6.8 stays installed as the managed track (it keeps getting patches and is the fallback to
+> boot), and the machine keeps running the kernel it already had. The tradeoff to know: that
+> kernel freezes at its current ABI, because the metapackage that moved it forward is exactly the
+> one being blocked.
 
 ### Step 8: Verify the preparation is ready
 
@@ -1944,6 +1995,7 @@ Unmistakable signature in the journal:
 
 | Upstream base | Situation |
 |---|---|
+| ≤ 6.18 | Compatible: `mongod` starts. Do not apply this runbook; the pin from [Step 7](#step-7-apply-adjustments-for-your-ubuntu-version) is enough. |
 | 6.19 – 7.0.13 | Real incompatibility. Apply this runbook. |
 | ≥ 7.0.14 | Kernel already fixed, but the guard blocks because of the `uname` string. Apply this runbook anyway. |
 
@@ -2002,6 +2054,15 @@ sudo apt purge linux-generic-hwe-24.04 linux-image-generic-hwe-24.04 \
 
 `apt install linux-generic` goes **before** the purge, so the GA metapackage owns the 6.8 image and
 no later `autoremove` can orphan it.
+
+> **If the machine runs 6.9 – 6.18 and `mongod` starts**, stop here: Step 3 and the reboot are not
+> needed, because the running kernel is already below the ceiling. Before the purge, protect its
+> image — losing its metapackage turns it into an automatic package:
+>
+> ```bash
+> sudo apt-mark manual linux-image-$(uname -r) linux-modules-$(uname -r) \
+>                      linux-modules-extra-$(uname -r) linux-headers-$(uname -r)
+> ```
 
 > **Do not try `apt-mark hold` on those three after the purge.** It fails:
 >
@@ -2207,14 +2268,16 @@ merely recommend it. But if you are hunting for the file by hand, that is where 
 Still without rebooting:
 
 ```bash
-GA=$(ls /lib/modules | grep '^6\.8\.' | sort -V | tail -1)
+# The target kernel is the newest compatible one (< 6.19) that is installed,
+# not 6.8 as such: if the machine already has a 6.14, that is where it boots.
+KDEST=$(ls /lib/modules | awk -F. '$1 == 6 && $2 < 19' | sort -V | tail -1)
 DRV=igc                  # or e1000e, igb, r8169 per Step 1
 ID=8086:125c             # the PCI ID from Step 1
 
 ALIAS="pci:v0000$(echo "${ID%:*}" | tr 'a-f' 'A-F')d0000$(echo "${ID#*:}" | tr 'a-f' 'A-F')"
-modinfo -k "$GA" "$DRV" | grep -qi "$ALIAS" \
-  && echo "OK: GA driver $GA knows $ID" \
-  || echo "MISSING: GA driver $GA does not declare $ID"
+modinfo -k "$KDEST" "$DRV" | grep -qi "$ALIAS" \
+  && echo "OK: the $KDEST driver knows $ID" \
+  || echo "MISSING: the $KDEST driver does not declare $ID"
 ```
 
 `modinfo -k` queries **another** kernel's module, so it works before booting it. It requires that
@@ -2698,7 +2761,9 @@ answer is **a newer driver via DKMS on the old kernel**.
 | Snaps | noble's `snapd` | No | None |
 
 **Three axes, not twenty.** One hard ceiling (MongoDB), one moving ceiling (NVIDIA's `.run`) and one
-rebuild (DKMS). Pinning GA 6.8 closes all three at once: it sits below MongoDB's ceiling, it is the
+rebuild (DKMS). Any kernel older than 6.19 sits below MongoDB's ceiling, so a machine already
+running 6.11 or 6.14 does not need to downgrade: what it needs is the pin, so it cannot move up.
+Pinning GA 6.8 closes all three at once: it sits below MongoDB's ceiling, it is the
 kernel this manual's 580.x was validated on, and it makes DKMS rebuilds deterministic. **As long as
 the kernel does not move, there is no matrix to maintain.**
 
