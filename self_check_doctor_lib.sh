@@ -50,6 +50,104 @@ t "sin blacklist tiene que pasar" 0 check_no_r8169_blacklist "$TMP/modprobe"
 echo 'blacklist   r8169' >"$TMP/modprobe/r8125.conf"
 t "blacklist de r8169 tiene que fallar" 1 check_no_r8169_blacklist "$TMP/modprobe"
 
+echo "4. ubuntu_base_version / ubuntu_base_codename"
+# Cada caso es una raíz falsa con su /etc/os-release (y su upstream-release si
+# la distro es un derivado). Mint no publica VERSION_ID de Ubuntu: 22.1 es la
+# versión de Mint, así que la base tiene que salir de upstream-release.
+distro() {  # distro <nombre> <os-release> [upstream-release]
+  local d="$TMP/distros/$1"
+  mkdir -p "$d/etc"
+  printf '%s\n' "$2" >"$d/etc/os-release"
+  if [ -n "${3:-}" ]; then
+    mkdir -p "$d/etc/upstream-release"
+    printf '%s\n' "$3" >"$d/etc/upstream-release/lsb-release"
+  fi
+  echo "$d"
+}
+
+to() {  # to <descripcion> <esperado> <comando...>
+  local desc="$1" esperado="$2"; shift 2
+  local obtenido
+  obtenido=$("$@" 2>/dev/null)
+  [ "$obtenido" = "$esperado" ] || { echo "   FALLA: $desc (esperado '$esperado', obtenido '$obtenido')"; fallos=$((fallos+1)); }
+}
+
+UBUNTU2404=$(distro ubuntu2404 'ID=ubuntu
+VERSION_ID="24.04"
+UBUNTU_CODENAME=noble')
+UBUNTU2204=$(distro ubuntu2204 'ID=ubuntu
+VERSION_ID="22.04"
+UBUNTU_CODENAME=jammy')
+MINT221=$(distro mint221 'ID=linuxmint
+ID_LIKE="ubuntu debian"
+VERSION_ID="22.1"
+UBUNTU_CODENAME=noble' 'DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=24.04
+DISTRIB_CODENAME=noble')
+MINT_SIN_UPSTREAM=$(distro mint_sin_upstream 'ID=linuxmint
+ID_LIKE="ubuntu debian"
+VERSION_ID="22.1"
+UBUNTU_CODENAME=noble')
+LMDE6=$(distro lmde6 'ID=linuxmint
+ID_LIKE=debian
+VERSION_ID="6"' 'DISTRIB_ID=Debian
+DISTRIB_RELEASE=12')
+DEBIAN12=$(distro debian12 'ID=debian
+VERSION_ID="12"')
+
+to "Ubuntu 24.04 se reporta tal cual" "24.04" ubuntu_base_version "$UBUNTU2404"
+to "Ubuntu 22.04 se reporta tal cual" "22.04" ubuntu_base_version "$UBUNTU2204"
+to "Mint 22.1 tiene que dar la base 24.04, no 22.1" "24.04" ubuntu_base_version "$MINT221"
+to "Mint sin upstream-release cae en UBUNTU_CODENAME" "24.04" ubuntu_base_version "$MINT_SIN_UPSTREAM"
+t "LMDE (base Debian) no es base Ubuntu" 1 ubuntu_base_version "$LMDE6"
+t "Debian puro no es base Ubuntu" 1 ubuntu_base_version "$DEBIAN12"
+to "el codename de Mint 22.x es noble, no wilma" "noble" ubuntu_base_codename "$MINT221"
+to "el codename de Ubuntu 22.04 es jammy" "jammy" ubuntu_base_codename "$UBUNTU2204"
+t "sin base Ubuntu no hay codename" 1 ubuntu_base_codename "$DEBIAN12"
+
+echo
+echo "5. check_nvidia_gpu (por sysfs, sin lspci)"
+# El bug que esto fija: "lspci | grep -qi nvidia" contesta "no hay GPU" en
+# cuanto lspci escribe mas de un bloque de 4 KB, porque grep -q corta el pipe y
+# pipefail propaga el SIGPIPE. Driver andando, nvidia-smi feliz, y el doctor
+# marcando la GPU como ausente. Sysfs no tiene pipe ni depende de pciutils.
+gpu_root() {  # gpu_root <nombre> <vendor...>
+  local dir="$TMP/$1" n=0 v
+  shift
+  for v in "$@"; do
+    mkdir -p "$dir/sys/bus/pci/devices/0000:0$n:00.0"
+    printf '%s\n' "$v" >"$dir/sys/bus/pci/devices/0000:0$n:00.0/vendor"
+    n=$((n + 1))
+  done
+  mkdir -p "$dir/sys/bus/pci/devices"
+  printf '%s\n' "$dir"
+}
+# nvidia-smi no debe entrar como fallback en estos casos: se anula.
+nvidia-smi() { return 1; }
+
+t "vendor 0x10de presente = hay GPU" 0 check_nvidia_gpu "$(gpu_root solo_nvidia 0x10de)"
+t "0x10de entre otras placas = hay GPU" 0 check_nvidia_gpu "$(gpu_root entre_otras 0x8086 0x1002 0x10de)"
+t "sin 0x10de = no hay GPU" 1 check_nvidia_gpu "$(gpu_root sin_nvidia 0x8086 0x10ec)"
+t "sysfs vacio = no hay GPU" 1 check_nvidia_gpu "$(gpu_root vacio)"
+
+echo
+echo "6. unblock_snapd (Linux Mint)"
+# Mint trae /etc/apt/preferences.d/nosnap.pref y sin sacarlo apt deja snapd sin
+# candidato: cualquier "snap install" muere con un "command not found". El
+# doctor --fix lo saca, pero con respaldo: revertir tiene que ser un mv.
+sudo() { "$@"; }            # el self-check no eleva privilegios
+apt-get() { :; }            # ni toca los índices de apt
+NOSNAP_PREF="$TMP/nosnap/etc/apt/preferences.d/nosnap.pref"
+NOSNAP_BACKUP="$TMP/nosnap/var/backups/nosnap.pref.omnifish"
+mkdir -p "$(dirname "$NOSNAP_PREF")"
+printf 'Package: snapd\nPin: release a=*\nPin-Priority: -10\n' >"$NOSNAP_PREF"
+
+t "quitar el bloqueo de snapd sale 0" 0 unblock_snapd
+t "nosnap.pref ya no está" 1 test -f "$NOSNAP_PREF"
+t "quedó el respaldo, para poder revertir" 0 test -s "$NOSNAP_BACKUP"
+t "idempotente: sin el archivo no falla" 0 unblock_snapd
+to "el respaldo es el archivo original" "Pin-Priority: -10" tail -1 "$NOSNAP_BACKUP"
+
 echo
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"

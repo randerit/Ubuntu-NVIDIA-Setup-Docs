@@ -31,10 +31,12 @@ echo -e "  Host:  $(hostname)"
 # --- 1. Sistema Base ---
 section "1. Sistema Operativo"
 
-check_and_fix "Ubuntu instalado" "lsb_release -a 2>/dev/null | grep -qi ubuntu"
+check_and_fix "Base Ubuntu detectada (Ubuntu o derivado directo, ej. Linux Mint)" \
+    "ubuntu_base_version"
 
-ubuntu_version=$(lsb_release -rs 2>/dev/null || echo "desconocida")
-info "Versión detectada: ${ubuntu_version}"
+ubuntu_version=$(ubuntu_base_version 2>/dev/null || echo "desconocida")
+distro_pretty=$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-desconocida}")
+info "Distribución: ${distro_pretty} (base Ubuntu ${ubuntu_version})"
 
 check_and_fix "Kernel Linux" "uname -r"
 info "Kernel: $(uname -r)"
@@ -140,7 +142,7 @@ check_and_fix_warn "Servicio SSH activo" "systemctl is-active ssh"
 check_and_fix_warn "UFW instalado" "command -v ufw" "fix_apt ufw"
 
 if command -v ufw > /dev/null 2>&1; then
-    ufw_status=$(sudo ufw status 2>/dev/null | head -1 || echo "no disponible")
+    ufw_status=$(head -1 <<<"$(sudo ufw status 2>/dev/null)" || echo "no disponible")
     info "UFW: ${ufw_status}"
 fi
 
@@ -213,10 +215,10 @@ section "7. MongoDB"
 
 check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
     "check_kernel_mongodb_ok" \
-    "Kernel $(uname -r) bloquea el arranque de mongod (SERVER-121912). Aplica la Sección 14 del README: volver al track GA 6.8."
-check_manual "Pin del kernel GA persistente" \
+    "Kernel $(uname -r) bloquea el arranque de mongod (SERVER-121912). Aplica la Sección 14 del README: arrancar en un kernel anterior a 6.19 (el 6.8 GA, o el 6.11/6.14 si el equipo ya lo tiene)."
+check_manual "Pin del kernel persistente (bloquea 6.19+)" \
     "check_kernel_pin" \
-    "Falta el pin del track GA. Sin él un apt upgrade futuro reinstala el HWE y deja el equipo sin base de datos. Aplica el Paso 7 de la Sección 3."
+    "Falta el pin. El kernel actual puede ser compatible, pero sin pin un apt upgrade futuro trae el HWE 7.0 y deja el equipo sin base de datos. Aplica el Paso 7 de la Sección 3."
 check_manual "NIC Ethernet con driver activo (Sección 14 Caso C)" \
     "check_nic_driver_bound" \
     "Hay una NIC Ethernet sin driver: el del kernel no soporta ese chip. Con los paquetes 2.3.0+: sudo omnifish-nic-rescue. A mano, Caso C de la Sección 14."
@@ -368,34 +370,39 @@ section "13. Puertos y Conectividad"
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
 
-if command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "active"; then
+# Una sola llamada a ufw, capturada en variable. Pasarle la salida de ufw a un
+# "grep -q" por pipe es un falso negativo con muchas reglas: grep -q corta el
+# pipe, ufw muere con SIGPIPE y pipefail propaga el 141. De paso, evita diez
+# sudo seguidos.
+UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
+if grep -q "active" <<<"$UFW_STATUS"; then
     info "Verificando reglas de firewall..."
     check_and_fix_minor "Puerto SSH (22) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])22(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow ssh"
     check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 27017/tcp"
     check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 1883/tcp"
     check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 18083/tcp"
     check_and_fix_minor "Puerto GStreamer RTSP (554) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])554(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])554(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 554/tcp && sudo ufw allow 554/udp"
     check_and_fix_minor "Puerto AnyDesk HTTP (80) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])80(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])80(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 80/tcp"
     check_and_fix_minor "Puerto AnyDesk HTTPS (443) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])443(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])443(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 443/tcp"
     check_and_fix_minor "Puerto AnyDesk (6568) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])6568(/|[^0-9]|\$)'" \
+        "grep -qE '(^|[^0-9])6568(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 6568/tcp"
     check_and_fix_minor "Puerto AnyDesk UDP (50001-50003) configurado" \
-        "sudo ufw status | grep -qE '(^|[^0-9])50001(/|[^0-9]|\$|:)'" \
+        "grep -qE '(^|[^0-9])50001(/|[^0-9]|\$|:)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 50001:50003/udp"
 else
     info "UFW no activo, omitiendo verificación de puertos"
