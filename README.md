@@ -66,6 +66,36 @@ Confirma estos puntos antes de instalar Ubuntu:
 - Si el equipo será administrado remotamente, igual puedes partir con **Ubuntu Desktop** y luego desactivar la interfaz gráfica.
 - Si necesitas dual boot con Windows, no uses el camino simple de esta sección; requiere particionado manual.
 
+### Ubuntu y derivados directos (Linux Mint)
+
+El manual está escrito para Ubuntu LTS, y también sirve para los derivados directos que
+reempaquetan Ubuntu sin cambiar la base: **Linux Mint 21.x (base 22.04)** y **Linux Mint 22.x
+(base 24.04)**. Lo que importa es la base, no el número de la distro: Mint 22.1 no es Ubuntu
+22.04, es Ubuntu 24.04 reempaquetado. Comprueba la base con:
+
+```bash
+cat /etc/upstream-release/lsb-release
+```
+
+Debe decir `DISTRIB_ID=Ubuntu` y `DISTRIB_RELEASE=24.04` (o `22.04`). Si el archivo no existe,
+mira `UBUNTU_CODENAME` en `/etc/os-release` (`noble` = 24.04, `jammy` = 22.04).
+
+> **No uses `lsb_release -cs` en un derivado.** En Mint devuelve su propio codename
+> (`wilma`, `xia`, `virginia`), que no existe en los repositorios de Ubuntu, NVIDIA, MongoDB
+> ni EMQX: cualquier repo armado con ese valor da 404. Usa siempre `noble` o `jammy` según la
+> base.
+
+Tres diferencias de Mint que sí cambian pasos de este manual:
+
+| Diferencia | Qué implica |
+|-----------|-------------|
+| `/etc/apt/preferences.d/nosnap.pref` bloquea `snapd` | Con ese pin (`-10`) `apt` deja `snapd` sin candidato y los pasos por snap (Go, VS Code) no corren. Para habilitarlos: `sudo cp -a /etc/apt/preferences.d/nosnap.pref /var/backups/nosnap.pref.bak && sudo rm /etc/apt/preferences.d/nosnap.pref && sudo apt-get update`. Revertir es un `mv` del respaldo. Los instaladores 2.5.0+ y `workstation-doctor-compresion --fix` lo hacen solos, salvo con `--skip-snaps`. |
+| El gestor de sesión es LightDM, no GDM | Los ajustes de `/etc/gdm3/custom.conf` (por ejemplo desactivar Wayland) no aplican: Mint ya corre X11 con Cinnamon. Para apagar la interfaz gráfica usa `lightdm` en lugar de `gdm3`. |
+| El Gestor de Actualizaciones de Mint ofrece kernels | Si fijaste el kernel por MongoDB 8, no instales kernels desde ahí; el pin de `apt` no cubre lo que se instale a mano. El 6.14 que trae Mint 22.2 es compatible y **no** hay que bajarlo a 6.8. |
+
+LMDE (Linux Mint Debian Edition) **no** sirve: su base es Debian, no Ubuntu, y los
+instaladores la rechazan.
+
 ---
 
 ## 2. Instalación del Sistema Ubuntu
@@ -340,6 +370,10 @@ Primero mira tu versión:
 lsb_release -rs
 ```
 
+> **En Linux Mint** este comando devuelve la versión de Mint (por ejemplo `22.1`), no la de
+> Ubuntu. La base es la que manda: sácala de `/etc/upstream-release/lsb-release` y aplica los
+> ajustes de esa versión.
+
 Para **Ubuntu 22.04 LTS**, instala GCC/G++ 12 si vas a usar versiones de CUDA que lo requieran:
 
 ```bash
@@ -396,6 +430,23 @@ apt-cache policy linux-image-generic       # esperado: 500 / 6.8.0-1XX.XXX  ← 
 > **Si `uname -r` ya muestra `7.0.0-XX`**, el equipo nació con el HWE instalado y este pinning
 > solo evita que empeore: falta purgar el 7.0. No sigas con MongoDB; ve a la
 > [Sección 14, Caso A](#caso-a--equipo-ya-desplegado-corriendo-kernel-70).
+
+> **Si `uname -r` muestra 6.9 – 6.18, no lo bajes a 6.8.** El techo de MongoDB 8 es 6.19: todo
+> kernel anterior arranca `mongod` sin problema. El `6.11` de una ISO 24.04.2, el `6.14` de una
+> 24.04.3 y el `6.14` que trae Linux Mint 22.2 ya son compatibles, y bajarlos a 6.8 resigna
+> soporte de hardware sin arreglar nada. Aplicá el pinning igual: el HWE de noble hoy apunta a
+> 7.0, así que sin pin el próximo `apt full-upgrade` sí rompe MongoDB. Y al purgar los
+> metapaquetes HWE, marcá el kernel en uso como manual para que ningún `autoremove` lo saque:
+>
+> ```bash
+> sudo apt-mark manual linux-image-$(uname -r) linux-modules-$(uname -r) \
+>                      linux-modules-extra-$(uname -r) linux-headers-$(uname -r)
+> ```
+>
+> El GA 6.8 queda instalado como track manejado (sigue recibiendo parches y es el respaldo para
+> arrancar), y el equipo sigue usando el kernel que ya tenía. La contrapartida a saber: ese
+> kernel queda congelado en su ABI actual, porque el metapaquete que lo hacía avanzar es
+> justamente el que se bloquea.
 
 ### Paso 8: Verifica que la preparación quedó lista
 
@@ -1989,6 +2040,7 @@ Firma inequívoca del problema en el journal:
 
 | Base upstream | Situación |
 |---|---|
+| ≤ 6.18 | Compatible: `mongod` arranca. No apliques este runbook; alcanza el pin del [Paso 7](#paso-7-aplica-ajustes-según-tu-versión-de-ubuntu). |
 | 6.19 – 7.0.13 | Incompatibilidad real. Aplica este runbook. |
 | ≥ 7.0.14 | Kernel ya corregido, pero el guard bloquea por el string de `uname`. Igual aplica este runbook. |
 
@@ -2047,6 +2099,15 @@ sudo apt purge linux-generic-hwe-24.04 linux-image-generic-hwe-24.04 \
 
 `apt install linux-generic` va **antes** del purge: así el metapaquete GA queda dueño de la
 imagen 6.8 y ningún `autoremove` posterior puede dejarla huérfana.
+
+> **Si el equipo corre 6.9 – 6.18 y `mongod` arranca**, terminá acá: no hace falta el Paso 3 ni
+> el reinicio, porque el kernel en uso ya está debajo del techo. Antes del purge protegé su
+> imagen, que al quedarse sin metapaquete pasa a ser automática:
+>
+> ```bash
+> sudo apt-mark manual linux-image-$(uname -r) linux-modules-$(uname -r) \
+>                      linux-modules-extra-$(uname -r) linux-headers-$(uname -r)
+> ```
 
 > **No intentes `apt-mark hold` sobre estos tres después del purge.** Falla:
 >
@@ -2250,14 +2311,16 @@ si estás buscando el archivo a mano, está ahí y no en `linux-modules`.
 Todavía sin reiniciar:
 
 ```bash
-GA=$(ls /lib/modules | grep '^6\.8\.' | sort -V | tail -1)
+# El kernel destino es el compatible (< 6.19) mas nuevo que haya instalado, no
+# el 6.8 a secas: si el equipo ya tiene un 6.14, ahi va a arrancar.
+KDEST=$(ls /lib/modules | awk -F. '$1 == 6 && $2 < 19' | sort -V | tail -1)
 DRV=igc                  # o e1000e, igb, r8169 segun el Paso 1
 ID=8086:125c             # el PCI ID del Paso 1
 
 ALIAS="pci:v0000$(echo "${ID%:*}" | tr 'a-f' 'A-F')d0000$(echo "${ID#*:}" | tr 'a-f' 'A-F')"
-modinfo -k "$GA" "$DRV" | grep -qi "$ALIAS" \
-  && echo "OK: el driver del GA $GA conoce $ID" \
-  || echo "FALTA: el driver del GA $GA no declara $ID"
+modinfo -k "$KDEST" "$DRV" | grep -qi "$ALIAS" \
+  && echo "OK: el driver de $KDEST conoce $ID" \
+  || echo "FALTA: el driver de $KDEST no declara $ID"
 ```
 
 `modinfo -k` consulta el módulo de **otro** kernel, así que funciona antes de arrancarlo. Requiere
@@ -2741,7 +2804,9 @@ respuesta es **un driver más nuevo por DKMS sobre el kernel viejo**.
 | Snaps | `snapd` de noble | No | Ninguna |
 
 **Tres ejes, no veinte.** Un techo duro (MongoDB), un techo móvil (el `.run` de NVIDIA) y una
-recompilación (DKMS). El pin del GA 6.8 cierra los tres de una vez: queda debajo del techo de
+recompilación (DKMS). Cualquier kernel anterior a 6.19 queda debajo del techo de MongoDB, así
+que un equipo que ya corre 6.11 o 6.14 no necesita bajar de versión: lo que hace falta es el pin,
+para que no suba. El GA 6.8 cierra los tres problemas de una vez: queda debajo del techo de
 MongoDB, es el kernel sobre el que se validó el 580.x de este manual, y vuelve deterministas las
 recompilaciones de DKMS. **Mientras el kernel no se mueva, no hay matriz que mantener.**
 
