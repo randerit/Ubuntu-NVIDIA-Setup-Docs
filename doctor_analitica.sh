@@ -206,9 +206,15 @@ fi
 check_and_fix "PATH incluye CUDA" "echo \"\$PATH\" | grep -qi cuda"
 check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \"\${LD_LIBRARY_PATH:-}\" | grep -qi cuda"
 check_and_fix "Configuración CUDA en el sistema" "check_cuda_configured"
-check_manual "CUDA Toolkit en la versión fijada (${CUDA_VERSION_EXPECTED})" \
-    "check_cuda_version" \
-    "La Sección 5 fija CUDA ${CUDA_VERSION_EXPECTED} con el instalador .deb local. Instala solo cuda-toolkit, nunca los metapaquetes cuda ni cuda-drivers."
+check_manual "CUDA Toolkit coherente (nvcc, symlink y paquete en la misma versión)" \
+    "check_cuda_coherente" \
+    "nvcc dice $(cuda_version_nvcc), /usr/local/cuda apunta a $(cuda_version_symlink) y dpkg sostiene: $(cuda_versions_paquete | tr '\n' ' '). Todo lo que corra bajo sudo o como servicio usa el symlink, no tu PATH. Fijalo: sudo update-alternatives --set cuda /usr/local/cuda-VERSION"
+# La versión del manual es la preferida, no la única válida: el instalador .deb
+# 2.9.0+ adopta la que el equipo ya tenga. Se informa, no se reprueba.
+if ! check_cuda_version; then
+    info "CUDA $(cuda_version_en_uso) en uso; la Sección 5 fija la ${CUDA_VERSION_EXPECTED}"
+    info "No es un error mientras todas las fuentes apunten a la misma versión"
+fi
 
 # --- 7. MongoDB (Sección 7) ---
 section "7. MongoDB"
