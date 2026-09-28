@@ -84,10 +84,15 @@ info() {
     echo -e "  ${INFO} $1"
 }
 
+# $2 opcional: el instalador que arregla lo de esta sección. El doctor del
+# perfil verifica la estación entera, y un rojo de CUDA o de puertos no se
+# arregla reejecutando el perfil.
 section() {
+    local titulo="$1"
+    [ -n "${2:-}" ] && titulo="$1  (→ $2)"
     echo ""
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BOLD}  $1${NC}"
+    echo -e "${BOLD}  ${titulo}${NC}"
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 

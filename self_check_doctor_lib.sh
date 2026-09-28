@@ -168,6 +168,21 @@ t "ninguna URL de libtinfo5 con versión fija" 1 \
   grep -qE 'libtinfo5_[0-9][0-9.a-z~+-]*_amd64\.deb' doctor_lib.sh
 
 echo
+echo "8. cada sección nombra el instalador que la arregla"
+# En terreno el doctor del perfil mostró rojos de CUDA y de puertos, que no son
+# del perfil, y no había forma de saber qué reejecutar.
+to "section muestra el responsable" "  6. CUDA Toolkit  (→ nvidia-cuda-setup)" \
+   bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "6. CUDA Toolkit" nvidia-cuda-setup | sed -n 3p'
+to "section sin responsable queda igual" "  1. Sistema Operativo" \
+   bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "1. Sistema Operativo" | sed -n 3p'
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  while IFS= read -r linea; do
+    [[ "$linea" == 'section "1. Sistema Operativo"' ]] && continue
+    grep -qE '^section "[^"]+" "workstation-(nvidia-setup|dependencies|workstation-hardening)"$' <<<"$linea" \
+      || { echo "   FALLA: $d sin responsable: $linea"; fallos=$((fallos+1)); }
+  done < <(grep -E '^section "' "$d")
+done
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else
