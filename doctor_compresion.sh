@@ -44,7 +44,7 @@ info "Kernel: $(uname -r)"
 check_and_fix "Arquitectura x86_64" "uname -m | grep -q x86_64"
 
 # --- 2. Preparación del Sistema (Sección 3) ---
-section "2. Preparación del Sistema"
+section "2. Preparación del Sistema" "omnifish-nvidia-setup"
 
 check_and_fix "build-essential instalado" \
     "pkg_installed build-essential" \
@@ -112,7 +112,7 @@ check_and_fix "Librerías GStreamer plugins base dev" \
     "fix_apt libgstreamer-plugins-base1.0-dev"
 
 # --- 3. Wayland/Xorg ---
-section "3. Entorno Gráfico"
+section "3. Entorno Gráfico" "omnifish-workstation-hardening"
 
 session_type="${XDG_SESSION_TYPE:-desconocido}"
 if [ "$session_type" = "x11" ]; then
@@ -133,7 +133,7 @@ target=$(systemctl get-default 2>/dev/null || echo "desconocido")
 info "Target actual: ${target}"
 
 # --- 4. SSH y Firewall ---
-section "4. SSH y Firewall"
+section "4. SSH y Firewall" "omnifish-workstation-hardening"
 
 check_and_fix "OpenSSH Server instalado" \
     "pkg_installed openssh-server" \
@@ -147,7 +147,7 @@ if command -v ufw > /dev/null 2>&1; then
 fi
 
 # --- 5. Drivers NVIDIA (Sección 4) ---
-section "5. Drivers NVIDIA"
+section "5. Drivers NVIDIA" "omnifish-nvidia-setup"
 
 check_manual "nvidia-smi disponible" \
     "command -v nvidia-smi" \
@@ -189,7 +189,7 @@ check_and_fix_warn "Módulo open/MIT-GPL (recomendado para RTX 20/30/40/50)" \
     "check_nvidia_open_module"
 
 # --- 6. CUDA Toolkit (Sección 5) ---
-section "6. CUDA Toolkit"
+section "6. CUDA Toolkit" "omnifish-nvidia-setup"
 
 # Detectar CUDA desde el filesystem si no está en el PATH
 detect_cuda_from_system
@@ -217,7 +217,7 @@ if ! check_cuda_version; then
 fi
 
 # --- 7. MongoDB (Sección 6) ---
-section "7. MongoDB"
+section "7. MongoDB" "omnifish-dependencies"
 
 check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
     "check_kernel_mongodb_ok" \
@@ -263,7 +263,7 @@ if command -v mongodb-compass > /dev/null 2>&1; then
 fi
 
 # --- 8. EMQX (Sección 6) ---
-section "8. EMQX (Broker MQTT)"
+section "8. EMQX (Broker MQTT)" "omnifish-dependencies"
 
 check_and_fix "EMQX instalado" \
     "command -v emqx" \
@@ -283,7 +283,7 @@ if systemctl is-active emqx > /dev/null 2>&1; then
 fi
 
 # --- 9. Golang (Sección 6) ---
-section "9. Golang"
+section "9. Golang" "omnifish-dependencies"
 
 check_and_fix "Go instalado" "command -v go" "fix_snap go"
 
@@ -293,7 +293,7 @@ if command -v go > /dev/null 2>&1; then
 fi
 
 # --- 10. Visual Studio Code (Sección 6) ---
-section "10. Visual Studio Code"
+section "10. Visual Studio Code" "omnifish-dependencies"
 
 check_and_fix "VSCode instalado" "command -v code" "fix_snap code"
 
@@ -303,7 +303,7 @@ if command -v code > /dev/null 2>&1; then
 fi
 
 # --- 11. GStreamer (Sección 6) ---
-section "11. GStreamer y Plugins"
+section "11. GStreamer y Plugins" "omnifish-dependencies"
 
 check_and_fix "GStreamer instalado (gst-launch-1.0)" \
     "command -v gst-launch-1.0" \
@@ -354,7 +354,7 @@ check_and_fix_warn "Plugin NVIDIA (nvh264enc)" "gst-inspect-1.0 nvh264enc"
 check_and_fix_warn "Plugin rtspclientsink" "gst-inspect-1.0 rtspclientsink"
 
 # --- 12. Herramientas de Red y Soporte Remoto (Sección 6) ---
-section "12. Herramientas de Red y Soporte Remoto"
+section "12. Herramientas de Red y Soporte Remoto" "omnifish-dependencies"
 
 check_and_fix_warn "Angry IP Scanner instalado" \
     "command -v ipscan" \
@@ -375,7 +375,7 @@ check_and_fix_warn "RustDesk instalado" \
     "fix_deb_url '${RUSTDESK_URL}'"
 
 # --- 13. Puertos (Sección 6) ---
-section "13. Puertos y Conectividad"
+section "13. Puertos y Conectividad" "omnifish-workstation-hardening"
 
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
@@ -419,7 +419,7 @@ else
 fi
 
 # --- 14. Versión de Ubuntu específica ---
-section "14. Dependencias Específicas por Versión"
+section "14. Dependencias Específicas por Versión" "omnifish-nvidia-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
     check_and_fix_warn "libtinfo5 instalado (requerido en 24.04)" \
