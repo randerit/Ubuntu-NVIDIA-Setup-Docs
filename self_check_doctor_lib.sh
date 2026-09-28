@@ -182,6 +182,10 @@ for d in doctor_compresion.sh doctor_analitica.sh; do
       || { echo "   FALLA: $d sin responsable: $linea"; fallos=$((fallos+1)); }
   done < <(grep -E '^section "' "$d")
 done
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  grep -qxF 'section "4. SSH y Firewall" "omnifish-dependencies"' "$d" \
+    || { echo "   FALLA: $d section 4 debe ser omnifish-dependencies"; fallos=$((fallos+1)); }
+done
 
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"

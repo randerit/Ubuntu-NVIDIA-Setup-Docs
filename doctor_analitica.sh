@@ -133,7 +133,7 @@ target=$(systemctl get-default 2>/dev/null || echo "desconocido")
 info "Target actual: ${target}"
 
 # --- 4. SSH y Firewall ---
-section "4. SSH y Firewall" "omnifish-workstation-hardening"
+section "4. SSH y Firewall" "omnifish-dependencies"
 
 check_and_fix "OpenSSH Server instalado" \
     "pkg_installed openssh-server" \
