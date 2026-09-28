@@ -215,8 +215,8 @@ if grep -qi '10ec:8125' <<<"$LSPCI_N"; then
     declare -A PCI_XID_MAP=()
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
-        addr=$(grep -oE '[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]' <<< "$line" | head -n1)
-        xid=$(grep -oE 'XID [0-9]+' <<< "$line" | grep -oE '[0-9]+' | head -n1)
+        addr=$(grep -oE '[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]' <<< "$line" | head -n1) || true
+        xid=$(grep -oE 'XID [0-9]+' <<< "$line" | grep -oE '[0-9]+' | head -n1) || true
         [[ -n "$addr" && -n "$xid" ]] && PCI_XID_MAP["$addr"]="$xid"
     done <<< "$XID_LINES"
 

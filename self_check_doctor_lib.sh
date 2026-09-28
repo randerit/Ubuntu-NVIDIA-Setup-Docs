@@ -149,6 +149,25 @@ t "idempotente: sin el archivo no falla" 0 unblock_snapd
 to "el respaldo es el archivo original" "Pin-Priority: -10" tail -1 "$NOSNAP_BACKUP"
 
 echo
+echo "7. libtinfo5_url"
+# El pool de security borra las versiones superadas: la URL fija a
+# 6.3-2ubuntu0.1 dio 404 cuando salió la 0.3 y el --fix no instalaba nada.
+wget() {  # índice falso del pool; solo responde a la descarga del índice
+  case "$*" in *qO-*) printf '%b' "$INDICE" ;; esac
+}
+INDICE='<a href="libtinfo5_6.2-0ubuntu2.1_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2ubuntu0.3_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2ubuntu0.3_i386.deb">x</a>\n'
+to "toma la última 6.3-2 amd64" \
+   "$LIBTINFO5_POOL/libtinfo5_6.3-2ubuntu0.3_amd64.deb" libtinfo5_url
+INDICE=''
+t "sin índice falla en vez de devolver una URL vacía" 1 libtinfo5_url
+unset -f wget
+t "ninguna URL de libtinfo5 con versión fija" 1 \
+  grep -qE 'libtinfo5_[0-9][0-9.a-z~+-]*_amd64\.deb' doctor_lib.sh
+
+echo
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else
