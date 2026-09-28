@@ -1234,7 +1234,8 @@ pip3 install --break-system-packages pandas numpy scikit-learn paho-mqtt ultraly
 > sistema.
 >
 > Si el nombre del paquete en conflicto es otro, cambialo en la primera línea. Desde 2.8.9,
-> `workstation-analytics` hace este reintento solo.
+> el instalador del perfil analítica (`workstation-analytics` en 2.x, hoy
+> `workstation-dependencies --perfil analitica`) hace este reintento solo.
 
 **Verificación (opcional):**
 ```bash
@@ -1763,9 +1764,9 @@ Y el instalador de perfil **cierra corriendo su doctor** (modo lectura, sin `--f
 aprovisionar y verificar es un solo comando:
 
 ```bash
-sudo workstation-compression                # instala y termina con el doctor
-sudo workstation-compression --no-doctor    # instalar sin verificar
-workstation-compression --doctor-only       # verificar sin instalar
+sudo workstation-dependencies --perfil compresion       # primera vez: instala y termina con el doctor
+sudo workstation-dependencies --no-doctor               # reinstalar/reejecutar sin verificar
+workstation-dependencies --doctor-only                  # verificar sin instalar
 ```
 
 `--doctor-only` es el modo gate: no instala nada, **no necesita root** (el doctor en modo lectura no
@@ -1773,7 +1774,7 @@ toca el sistema) y **sale con el número de fallos como exit code**, así que si
 equipo se despacha o no:
 
 ```bash
-if workstation-compression --doctor-only; then
+if workstation-dependencies --doctor-only; then
   echo "listo para terreno"
 fi
 ```
