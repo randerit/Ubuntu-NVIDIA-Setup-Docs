@@ -1198,7 +1198,8 @@ pip3 install --break-system-packages pandas numpy scikit-learn paho-mqtt ultraly
 > it.
 >
 > If the conflicting package has a different name, change it in the first line. Since 2.8.9,
-> `omnifish-workstation-analytics` performs this retry on its own.
+> the analytics-profile installer (`omnifish-workstation-analytics` in 2.x, today
+> `omnifish-dependencies --perfil analitica`) performs this retry on its own.
 
 **Verification:**
 ```bash
@@ -1722,9 +1723,9 @@ And the profile installer **finishes by running its doctor** (read-only, no `--f
 and verifying is a single command:
 
 ```bash
-sudo omnifish-workstation-compression                # installs and ends with the doctor
-sudo omnifish-workstation-compression --no-doctor    # install without verifying
-omnifish-workstation-compression --doctor-only       # verify without installing
+sudo omnifish-dependencies --perfil compresion       # first time: installs and ends with the doctor
+sudo omnifish-dependencies --no-doctor               # reinstall/rerun without verifying
+omnifish-dependencies --doctor-only                  # verify without installing
 ```
 
 `--doctor-only` is the gate mode: it installs nothing, **needs no root** (the doctor in read-only
@@ -1732,7 +1733,7 @@ mode touches nothing) and **exits with the number of failures as its exit code**
 whether a machine ships:
 
 ```bash
-if omnifish-workstation-compression --doctor-only; then
+if omnifish-dependencies --doctor-only; then
   echo "ready for the field"
 fi
 ```
