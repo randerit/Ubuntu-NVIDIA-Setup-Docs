@@ -44,7 +44,7 @@ info "Kernel: $(uname -r)"
 check_and_fix "Arquitectura x86_64" "uname -m | grep -q x86_64"
 
 # --- 2. Preparación del Sistema (Sección 3) ---
-section "2. Preparación del Sistema"
+section "2. Preparación del Sistema" "omnifish-nvidia-setup"
 
 check_and_fix "build-essential instalado" \
     "pkg_installed build-essential" \
@@ -112,7 +112,7 @@ check_and_fix "Librerías GStreamer plugins base dev" \
     "fix_apt libgstreamer-plugins-base1.0-dev"
 
 # --- 3. Wayland/Xorg ---
-section "3. Entorno Gráfico"
+section "3. Entorno Gráfico" "omnifish-workstation-hardening"
 
 session_type="${XDG_SESSION_TYPE:-desconocido}"
 if [ "$session_type" = "x11" ]; then
@@ -133,7 +133,7 @@ target=$(systemctl get-default 2>/dev/null || echo "desconocido")
 info "Target actual: ${target}"
 
 # --- 4. SSH y Firewall ---
-section "4. SSH y Firewall"
+section "4. SSH y Firewall" "omnifish-dependencies"
 
 check_and_fix "OpenSSH Server instalado" \
     "pkg_installed openssh-server" \
@@ -147,7 +147,7 @@ if command -v ufw > /dev/null 2>&1; then
 fi
 
 # --- 5. Drivers NVIDIA (Sección 4) ---
-section "5. Drivers NVIDIA"
+section "5. Drivers NVIDIA" "omnifish-nvidia-setup"
 
 check_manual "nvidia-smi disponible" \
     "command -v nvidia-smi" \
@@ -189,7 +189,7 @@ check_and_fix_warn "Módulo open/MIT-GPL (recomendado para RTX 20/30/40/50)" \
     "check_nvidia_open_module"
 
 # --- 6. CUDA Toolkit (Sección 5) ---
-section "6. CUDA Toolkit"
+section "6. CUDA Toolkit" "omnifish-nvidia-setup"
 
 # Detectar CUDA desde el filesystem si no está en el PATH
 detect_cuda_from_system
@@ -206,12 +206,18 @@ fi
 check_and_fix "PATH incluye CUDA" "echo \"\$PATH\" | grep -qi cuda"
 check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \"\${LD_LIBRARY_PATH:-}\" | grep -qi cuda"
 check_and_fix "Configuración CUDA en el sistema" "check_cuda_configured"
-check_manual "CUDA Toolkit en la versión fijada (${CUDA_VERSION_EXPECTED})" \
-    "check_cuda_version" \
-    "La Sección 5 fija CUDA ${CUDA_VERSION_EXPECTED} con el instalador .deb local. Instala solo cuda-toolkit, nunca los metapaquetes cuda ni cuda-drivers."
+check_manual "CUDA Toolkit coherente (nvcc, symlink y paquete en la misma versión)" \
+    "check_cuda_coherente" \
+    "nvcc dice $(cuda_version_nvcc), /usr/local/cuda apunta a $(cuda_version_symlink) y dpkg sostiene: $(cuda_versions_paquete | tr '\n' ' '). Todo lo que corra bajo sudo o como servicio usa el symlink, no tu PATH. Fijalo: sudo update-alternatives --set cuda /usr/local/cuda-VERSION"
+# La versión del manual es la preferida, no la única válida: el instalador .deb
+# 2.9.0+ adopta la que el equipo ya tenga. Se informa, no se reprueba.
+if ! check_cuda_version; then
+    info "CUDA $(cuda_version_en_uso) en uso; la Sección 5 fija la ${CUDA_VERSION_EXPECTED}"
+    info "No es un error mientras todas las fuentes apunten a la misma versión"
+fi
 
 # --- 7. MongoDB (Sección 7) ---
-section "7. MongoDB"
+section "7. MongoDB" "omnifish-dependencies"
 
 check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
     "check_kernel_mongodb_ok" \
@@ -263,7 +269,7 @@ if systemctl is-active mongod > /dev/null 2>&1; then
 fi
 
 # --- 8. Node-RED (Sección 7) ---
-section "8. Node-RED"
+section "8. Node-RED" "omnifish-dependencies"
 
 check_and_fix "Node-RED instalado" \
     "command -v node-red" \
@@ -289,7 +295,7 @@ fi
 check_and_fix "npm instalado" "command -v npm"
 
 # --- 9. Python y Bibliotecas ML (Sección 7) ---
-section "9. Python y Machine Learning"
+section "9. Python y Machine Learning" "omnifish-dependencies"
 
 check_and_fix "Python3 instalado" \
     "command -v python3" \
@@ -347,7 +353,7 @@ if python3 -c "import ultralytics" > /dev/null 2>&1; then
 fi
 
 # --- 10. Puertos y Conectividad ---
-section "10. Puertos y Conectividad"
+section "10. Puertos y Conectividad" "omnifish-workstation-hardening"
 
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
@@ -373,7 +379,7 @@ else
 fi
 
 # --- 11. Versión de Ubuntu específica ---
-section "11. Dependencias Específicas por Versión"
+section "11. Dependencias Específicas por Versión" "omnifish-nvidia-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
     check_and_fix_warn "libtinfo5 instalado (requerido en 24.04)" \

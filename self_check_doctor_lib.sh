@@ -149,6 +149,44 @@ t "idempotente: sin el archivo no falla" 0 unblock_snapd
 to "el respaldo es el archivo original" "Pin-Priority: -10" tail -1 "$NOSNAP_BACKUP"
 
 echo
+echo "7. libtinfo5_url"
+# El pool de security borra las versiones superadas: la URL fija a
+# 6.3-2ubuntu0.1 dio 404 cuando salió la 0.3 y el --fix no instalaba nada.
+wget() {  # índice falso del pool; solo responde a la descarga del índice
+  case "$*" in *qO-*) printf '%b' "$INDICE" ;; esac
+}
+INDICE='<a href="libtinfo5_6.2-0ubuntu2.1_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2ubuntu0.3_amd64.deb">x</a>\n'
+INDICE+='<a href="libtinfo5_6.3-2ubuntu0.3_i386.deb">x</a>\n'
+to "toma la última 6.3-2 amd64" \
+   "$LIBTINFO5_POOL/libtinfo5_6.3-2ubuntu0.3_amd64.deb" libtinfo5_url
+INDICE=''
+t "sin índice falla en vez de devolver una URL vacía" 1 libtinfo5_url
+unset -f wget
+t "ninguna URL de libtinfo5 con versión fija" 1 \
+  grep -qE 'libtinfo5_[0-9][0-9.a-z~+-]*_amd64\.deb' doctor_lib.sh
+
+echo
+echo "8. cada sección nombra el instalador que la arregla"
+# En terreno el doctor del perfil mostró rojos de CUDA y de puertos, que no son
+# del perfil, y no había forma de saber qué reejecutar.
+to "section muestra el responsable" "  6. CUDA Toolkit  (→ omnifish-nvidia-setup)" \
+   bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "6. CUDA Toolkit" omnifish-nvidia-setup | sed -n 3p'
+to "section sin responsable queda igual" "  1. Sistema Operativo" \
+   bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "1. Sistema Operativo" | sed -n 3p'
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  while IFS= read -r linea; do
+    [[ "$linea" == 'section "1. Sistema Operativo"' ]] && continue
+    grep -qE '^section "[^"]+" "omnifish-(nvidia-setup|dependencies|workstation-hardening)"$' <<<"$linea" \
+      || { echo "   FALLA: $d sin responsable: $linea"; fallos=$((fallos+1)); }
+  done < <(grep -E '^section "' "$d")
+done
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  grep -qxF 'section "4. SSH y Firewall" "omnifish-dependencies"' "$d" \
+    || { echo "   FALLA: $d section 4 debe ser omnifish-dependencies"; fallos=$((fallos+1)); }
+done
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else

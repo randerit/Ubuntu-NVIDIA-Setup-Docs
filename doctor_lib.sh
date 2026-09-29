@@ -34,7 +34,7 @@ FIX_MODE=false
 LOG_FILE=""
 
 # --- Versiones de paquetes .deb (actualizar cuando cambien) ---
-MONGODB_COMPASS_VERSION="1.43.4"
+MONGODB_COMPASS_VERSION="1.49.15"
 MONGODB_COMPASS_URL="https://downloads.mongodb.com/compass/mongodb-compass_${MONGODB_COMPASS_VERSION}_amd64.deb"
 IPSCAN_VERSION="3.9.1"
 IPSCAN_URL="https://github.com/angryip/ipscan/releases/download/${IPSCAN_VERSION}/ipscan_${IPSCAN_VERSION}_amd64.deb"
@@ -84,10 +84,15 @@ info() {
     echo -e "  ${INFO} $1"
 }
 
+# $2 opcional: el instalador que arregla lo de esta sección. El doctor del
+# perfil verifica la estación entera, y un rojo de CUDA o de puertos no se
+# arregla reejecutando el perfil.
 section() {
+    local titulo="$1"
+    [ -n "${2:-}" ] && titulo="$1  (→ $2)"
     echo ""
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BOLD}  $1${NC}"
+    echo -e "${BOLD}  ${titulo}${NC}"
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 
@@ -285,13 +290,83 @@ check_nvidia_open_module() {
     [[ "$out" == *"Dual MIT/GPL"* ]]
 }
 
-# Versión de CUDA fijada por la Sección 5
+# Versión de CUDA que fija la Sección 5. Es la preferida, no la única válida: la
+# página de descargas de NVIDIA sirve siempre la última release, así que en
+# terreno aparecen equipos que llegaron con 13.1 o 13.4 puestos. Bajarlos de
+# versión son varios GB por un enlace de campo y purgar un toolkit que anda, así
+# que desde 2.9.0 el instalador .deb adopta la instalada en vez de forzar ésta y
+# el doctor hace lo mismo. Lo que sí tiene que cumplirse está en
+# check_cuda_coherente: que todas las fuentes apunten a la MISMA versión.
 CUDA_VERSION_EXPECTED="13.0"
 
-check_cuda_version() {
+# --- Versión de CUDA según cada fuente. Vacío si esa fuente no dice nada. ---
+
+# El nvcc del PATH: lo que ve el operador en su shell.
+cuda_version_nvcc() {
+    nvcc --version 2>/dev/null |
+        awk 'match($0, /release [0-9]+\.[0-9]+/) {
+               print substr($0, RSTART + 8, RLENGTH - 8); exit }'
+}
+
+# El symlink /usr/local/cuda: lo que ve TODO lo que corre bajo sudo o como
+# servicio, que no lee ~/.bashrc. Lo registra cada cuda-toolkit-XX-Y-config-common
+# con una prioridad derivada de su versión, así que en modo automático apunta
+# siempre a la más nueva instalada, sin importar cuál fijó el manual.
+cuda_version_symlink() {
+    local destino
+    destino=$(readlink -f /usr/local/cuda 2>/dev/null) || return 0
+    case "$destino" in
+        */cuda-[0-9]*) echo "${destino##*/cuda-}" ;;
+    esac
+}
+
+# Las que sostiene dpkg. Puede haber más de una instalada a la vez.
+cuda_versions_paquete() {
+    dpkg-query -W -f='${Package} ${db:Status-Status}\n' 2>/dev/null |
+        awk '$2 == "installed" && $1 ~ /^cuda-toolkit-[0-9]+-[0-9]+$/ {
+               sub(/^cuda-toolkit-/, "", $1); sub(/-/, ".", $1); print $1 }'
+}
+
+# La que está en uso de verdad: manda el symlink. Un PATH puede estar bien en la
+# sesión del operador y mal en todo lo demás; el symlink no.
+cuda_version_en_uso() {
     local v
-    v=$(nvcc --version 2>/dev/null | grep -oE 'release [0-9]+\.[0-9]+' | head -1 | awk '{print $2}')
-    [ "$v" = "$CUDA_VERSION_EXPECTED" ]
+    v=$(cuda_version_symlink)
+    [ -n "$v" ] || v=$(cuda_version_nvcc)
+    echo "$v"
+}
+
+# ¿Es la versión que fija el manual? Se sigue publicando porque el instalador la
+# usa y porque el resumen la nombra, pero ya no decide el [FALLO].
+check_cuda_version() {
+    [ "$(cuda_version_en_uso)" = "$CUDA_VERSION_EXPECTED" ]
+}
+
+# Lo que sí es un error: que las fuentes NO coincidan. Instalar un segundo
+# toolkit mueve el symlink a la versión nueva y deja al operador con un nvcc en
+# el PATH que dice una cosa y un /usr/local/cuda que dice otra — y todo lo que
+# compile bajo sudo o desde un servicio va contra el segundo. Los builds salen
+# contra headers de una versión y linkean contra las librerías de la otra.
+check_cuda_coherente() {
+    local nvcc_v sym_v en_uso v
+    nvcc_v=$(cuda_version_nvcc)
+    sym_v=$(cuda_version_symlink)
+
+    # Sin ninguna fuente no hay nada que comparar: de eso ya se queja el check de
+    # "nvcc disponible", y duplicar el rojo no agrega información.
+    [ -n "${nvcc_v}${sym_v}" ] || return 1
+
+    if [ -n "$nvcc_v" ] && [ -n "$sym_v" ] && [ "$nvcc_v" != "$sym_v" ]; then
+        return 1
+    fi
+
+    # Y dpkg tiene que sostener la versión en uso: un árbol en /usr/local sin
+    # paquete detrás es el resto de una purga a medias, y no recibe updates.
+    en_uso=$(cuda_version_en_uso)
+    for v in $(cuda_versions_paquete); do
+        [ "$v" = "$en_uso" ] && return 0
+    done
+    return 1
 }
 
 # Pin del kernel persistente (Sección 3 Paso 7 / Sección 14). Verificar solo
@@ -553,6 +628,16 @@ fix_snap() {
 }
 
 # Instalar .deb desde URL
+# Compass al dia: presencia + version. Con "command -v" a secas, un equipo que
+# quedo en la 1.43.4 pasaba el chequeo en verde mientras el operador peleaba con
+# el manejo de conexiones viejo.
+compass_al_dia() {
+    command -v mongodb-compass > /dev/null 2>&1 || return 1
+    local v
+    v=$(dpkg-query -W -f='${Version}' mongodb-compass 2>/dev/null || true)
+    dpkg --compare-versions "$v" ge "$MONGODB_COMPASS_VERSION"
+}
+
 fix_deb_url() {
     local url="$1"
     local deb_file="/tmp/$(basename "$url")"
@@ -687,8 +772,23 @@ fix_neofetch() {
 }
 
 # --- libtinfo5 para Ubuntu 24.04 ---
+# noble no lo publica: se trae el de jammy (6.3-2*) del pool de security. El
+# pool borra las versiones superadas, así que una URL con versión fija da 404 al
+# siguiente parche (pasó con la 6.3-2ubuntu0.1 cuando salió la 0.3). Se toma la
+# última que liste el índice.
+LIBTINFO5_POOL="http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses"
+libtinfo5_url() {
+    local deb
+    deb=$(wget -qO- "$LIBTINFO5_POOL/" 2>/dev/null |
+          grep -o 'libtinfo5_6\.3-2[^"<>/]*_amd64\.deb' | sort -u -t_ -k2,2V | tail -n1) || true
+    [ -n "$deb" ] || return 1
+    printf '%s/%s\n' "$LIBTINFO5_POOL" "$deb"
+}
+
 fix_libtinfo5() {
-    wget -q -O /tmp/libtinfo5.deb http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && \
+    local url
+    url=$(libtinfo5_url) && \
+    wget -q -O /tmp/libtinfo5.deb "$url" && \
     sudo apt-get install -y /tmp/libtinfo5.deb && \
     rm -f /tmp/libtinfo5.deb
 }

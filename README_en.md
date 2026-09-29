@@ -386,10 +386,12 @@ sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 120
 For **Ubuntu 24.04 LTS**, install `libtinfo5` only if CUDA or an older tool requests it:
 
 ```bash
-wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
-rm libtinfo5_6.3-2ubuntu0.1_amd64.deb
+wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.3_amd64.deb
+sudo apt install ./libtinfo5_6.3-2ubuntu0.3_amd64.deb
+rm libtinfo5_6.3-2ubuntu0.3_amd64.deb
 ```
+
+If `wget` returns 404, Ubuntu published a newer patch and removed the old one: take the highest `libtinfo5_6.3-2ubuntu0.*_amd64.deb` from http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/ (the doctor with `--fix` already resolves it on its own).
 
 If you do not know whether you need it, you can leave it for later. It does not block NVIDIA driver installation.
 
@@ -728,7 +730,30 @@ sudo cp /var/cuda-repo-ubuntu2404-13-0-local/cuda-*-keyring.gpg /usr/share/keyri
 sudo apt-get update
 ```
 
-> **Important:** The `.deb` filename changes with each release (`13.0.0-580.65.06-1` here). Before installing, go to [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads), choose Linux > x86_64 > Ubuntu > 24.04 > deb (local), and copy the exact commands NVIDIA shows.
+> **Important — do not change versions in this step.** The `.deb` filename changes with each release
+> (`13.0.0-580.65.06-1` here) and may eventually stop being published at that path.
+>
+> If the `wget` fails, do **not** go to [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads)
+> and copy the commands it shows: that page always serves the **latest** release, not 13.0. Its
+> commands install a different `cuda-toolkit-XX-Y`, which contradicts the pin declared at the top of
+> this same section and moves the `/usr/local/cuda` symlink to the newer version (see Step 4). The
+> machine ends up with two toolkits and with `nvcc` saying one thing in your shell and another under
+> `sudo`: that is what `omnifish-doctor-analitica` / `omnifish-doctor-compresion` fail on, in the
+> check `CUDA Toolkit coherente` (the doctors print in Spanish).
+>
+> The 13.0 local installer lives in the archive:
+> [https://developer.nvidia.com/cuda-toolkit-archive](https://developer.nvidia.com/cuda-toolkit-archive)
+> -> CUDA Toolkit 13.0.0 -> Linux > x86_64 > Ubuntu > 24.04 > deb (local).
+>
+> Changing the pinned version is a manual-wide decision, not a decision for this step: it also means
+> touching Step 4, `CUDA_VERSION_EXPECTED` in `doctor_lib.sh`, and `CUDA_VERSION` in the `.deb`
+> installers.
+>
+> **If the machine already came with a different version installed** (it happens: the download page
+> always serves the latest), there is no need to downgrade it. Since 2.9.0 the `.deb` installer
+> adopts whichever it finds, and the doctors validate **coherence** — that `nvcc`, the symlink and
+> `dpkg` all point at the same version — not the number itself. What is not accepted is a machine
+> with two toolkits and the sources disagreeing.
 
 ### Step 3: Install the toolkit only (no driver)
 
@@ -744,9 +769,22 @@ dpkg -l | grep cuda-toolkit-13-0
 ls /usr/local/cuda-13.0/bin/nvcc
 ```
 
-### Step 4: Configure PATH and LD_LIBRARY_PATH
+### Step 4: Pin the CUDA symlink and configure PATH and LD_LIBRARY_PATH
 
-Edit `~/.bashrc`:
+NVIDIA's packages register `/usr/local/cuda` with `update-alternatives` using a version-derived
+priority: if the machine ever had another toolkit, the newer one wins on its own and nothing puts it
+back. Pin it to the manual's version:
+
+```bash
+sudo update-alternatives --set cuda /usr/local/cuda-13.0
+```
+
+> **Why it matters:** the `omnifish-doctor-*` scripts run under `sudo`, and `sudo` does not read your
+> `~/.bashrc`. The `nvcc` the doctor sees is the one behind this symlink, not the one on your
+> interactive PATH. A machine with a correct `.bashrc` and a symlink pointing elsewhere still reports
+> `[FALLO]`.
+
+Now edit `~/.bashrc`:
 
 ```bash
 nano ~/.bashrc
@@ -767,8 +805,10 @@ source ~/.bashrc
 
 **Verification:**
 ```bash
+readlink -f /usr/local/cuda   # /usr/local/cuda-13.0
 which nvcc                # /usr/local/cuda-13.0/bin/nvcc
 nvcc --version            # release 13.0
+/usr/local/cuda/bin/nvcc --version   # what the doctor sees (without your PATH): release 13.0
 nvidia-smi                # 580.x.x driver still loaded
 ```
 
@@ -788,6 +828,9 @@ This does not touch the NVIDIA `.run` driver.
 ### CUDA Troubleshooting
 
 - **`nvcc: command not found`:** check `~/.bashrc` has the `export PATH=...` line and that you ran `source ~/.bashrc`.
+- **The doctor reports `[FALLO] CUDA Toolkit coherente` but your `nvcc --version` says 13.0:** the doctor runs under `sudo` and reads `/usr/local/cuda`, not your `~/.bashrc`. Compare with `readlink -f /usr/local/cuda` and apply the `update-alternatives --set` from Step 4. The doctor prints all three sources (nvcc, symlink and dpkg) in the message, so you can see which one disagrees.
+- **The machine has CUDA 13.1 or 13.4 instead of 13.0:** not an error by itself. The doctor reports it with `[INFO]` and only fails when the sources disagree; the 2.9.0+ `.deb` installer adopts that version instead of downloading another ~5 GB. If you do want the pinned one: `sudo omnifish-nvidia-setup --cuda-version 13.0`.
+- **You have two toolkits installed (`ls -d /usr/local/cuda-*` shows more than one):** someone followed the commands from NVIDIA's download page instead of Step 2. No purge needed: pinning the symlink from Step 4 is enough. To reclaim the space (~5 GB per toolkit), review `sudo apt-get -s purge 'cuda-toolkit-XX-Y' 'cuda-*-XX-Y'` before running it without `-s`.
 - **`apt` wants to install `nvidia-driver-*` or `cuda-drivers-*`:** you are calling the `cuda` meta-package. Use only `cuda-toolkit-13-0`.
 - **Driver stopped working after installing CUDA:** you installed `cuda` or `cuda-drivers`. Purge with the uninstall section, reinstall the `.run` driver (section 4), and reinstall only `cuda-toolkit-13-0`.
 - **`nvidia-smi` and `nvcc` report different versions:** this is normal. `nvidia-smi` shows the driver version, `nvcc` shows the toolkit version.
@@ -856,8 +899,8 @@ mongosh --eval "db.runCommand('ping')"
 #### Step 1: Download and Install
 Download from [https://www.mongodb.com/try/download/compass](https://www.mongodb.com/try/download/compass):
 ```bash
-wget https://downloads.mongodb.com/compass/mongodb-compass_1.43.4_amd64.deb
-sudo apt install -y ./mongodb-compass_1.43.4_amd64.deb
+wget https://downloads.mongodb.com/compass/mongodb-compass_1.49.15_amd64.deb
+sudo apt install -y ./mongodb-compass_1.49.15_amd64.deb
 ```
 
 If dependencies missing:
@@ -1120,13 +1163,43 @@ sudo apt install -y python3 python3-pip
 
 #### Step 2: Upgrade Pip
 ```bash
-pip3 install --upgrade pip
+pip3 install --upgrade pip --break-system-packages
 ```
 
+> If this step dies with `Cannot uninstall pip ... RECORD file not found`, it is the same case Step 3
+> explains: apply the recipe there using `pip` as the conflicting package.
+
 #### Step 3: Install Libraries
+> **Note:** `--break-system-packages` installs system-wide, so any Python script can import these
+> without activating a virtualenv.
+
 ```bash
-pip3 install pandas numpy scikit-learn paho-mqtt ultralytics
+pip3 install --break-system-packages pandas numpy scikit-learn paho-mqtt ultralytics
 ```
+
+> **If it dies with `ERROR: Cannot uninstall typing_extensions 4.10.0, RECORD file not found`:** this
+> is expected on Ubuntu 24.04, not your mistake. `ultralytics` pulls `torch`, which requires a newer
+> `typing_extensions` than the distro ships. `apt` put that package in
+> `/usr/lib/python3/dist-packages` **without a `RECORD` file** -- dpkg does not write one -- so pip
+> cannot tell which files to delete in order to replace it and **aborts the whole install**: not one
+> of the five libraries ends up installed, even though the log lists dozens of downloads.
+>
+> Install your own copy of the conflicting package and retry:
+>
+> ```bash
+> pip3 install --break-system-packages --ignore-installed typing_extensions
+> pip3 install --break-system-packages pandas numpy scikit-learn paho-mqtt ultralytics
+> ```
+>
+> `--ignore-installed` does **not** delete apt's file: dpkg stays intact and system packages that
+> depend on it keep working. It installs the new copy in `/usr/local/lib/python3.12/dist-packages`,
+> which comes first in `sys.path` and wins at import time. That is why
+> `sudo apt remove python3-typing-extensions` is **not** the way out: it takes system packages with
+> it.
+>
+> If the conflicting package has a different name, change it in the first line. Since 2.8.9,
+> the analytics-profile installer (`omnifish-workstation-analytics` in 2.x, today
+> `omnifish-dependencies --perfil analitica`) performs this retry on its own.
 
 **Verification:**
 ```bash
@@ -1148,14 +1221,15 @@ sudo ufw status
 ```
 
 ### General Tips
-- Use virtual environments: `python3 -m venv ml_env && source ml_env/bin/activate`.
-- Upgrade libraries: `pip3 install --upgrade <lib>`.
+- For your own projects, use virtual environments: `python3 -m venv ml_env && source ml_env/bin/activate`. The Step 3 libraries are installed system-wide on purpose, so any script sees them without activating anything.
+- Upgrade libraries: `pip3 install --break-system-packages --upgrade <lib>`.
 
 ### Troubleshooting
 - **MongoDB auth failing:** Check config in `/etc/mongod.conf`.
 - **`mongosh` cannot connect because `mongod` will not start:** If the journal shows `MongoDB cannot start: Linux kernel versions 6.19 and newer...`, it is the HWE 7.0 kernel, not the auth config. Apply [Section 14](#14-runbook-mongodb-8-fails-to-start-on-hwe-kernel-70).
 - **Node-RED not starting:** Check logs: `sudo journalctl -u nodered`.
-- **Pip installing slow:** Use mirror: `pip3 install --index-url https://pypi.org/simple <lib>`.
+- **Pip installing slow:** Use mirror: `pip3 install --break-system-packages --index-url https://pypi.org/simple <lib>`.
+- **`Cannot uninstall <package>, RECORD file not found`:** the package was installed by `apt`, not pip, and it aborts the entire transaction. See the callout in Step 3.
 
 > **Additional Resources:**
 > * [Node-RED Docs](https://nodered.org/docs/)
@@ -1649,9 +1723,9 @@ And the profile installer **finishes by running its doctor** (read-only, no `--f
 and verifying is a single command:
 
 ```bash
-sudo omnifish-workstation-compression                # installs and ends with the doctor
-sudo omnifish-workstation-compression --no-doctor    # install without verifying
-omnifish-workstation-compression --doctor-only       # verify without installing
+sudo omnifish-dependencies --perfil compresion       # first time: installs and ends with the doctor
+sudo omnifish-dependencies --no-doctor               # reinstall/rerun without verifying
+omnifish-dependencies --doctor-only                  # verify without installing
 ```
 
 `--doctor-only` is the gate mode: it installs nothing, **needs no root** (the doctor in read-only
@@ -1659,7 +1733,7 @@ mode touches nothing) and **exits with the number of failures as its exit code**
 whether a machine ships:
 
 ```bash
-if omnifish-workstation-compression --doctor-only; then
+if omnifish-dependencies --doctor-only; then
   echo "ready for the field"
 fi
 ```
@@ -1842,7 +1916,7 @@ In the summary:
 - Driver on the branch pinned by this manual (580.x.x) and installed via `.run`, **not** APT. A machine with `nvidia-driver-*` from APT used to pass every NVIDIA check even though Section 4 treats it as an error to purge
 - Open/MIT-GPL kernel module, recommended by Section 4 Step 5 for RTX 20/30/40/50
 - CUDA Toolkit (nvcc, PATH, LD_LIBRARY_PATH, system configuration)
-- CUDA on the version pinned by Section 5 (13.0)
+- CUDA coherent: `nvcc`, the `/usr/local/cuda` symlink and `dpkg` all pointing at the same version. The number itself is informational — Section 5 pins 13.0, but a machine that arrived with 13.1 or 13.4 is valid as long as the sources agree
 - Persistent GA kernel pin. Checking `uname -r` alone is not enough: a machine on 6.8 today but without the pin returns to HWE on the next `apt upgrade` and ends up with no database
 - Transparent Huge Pages enabled, which MongoDB 8.0 requires
 
