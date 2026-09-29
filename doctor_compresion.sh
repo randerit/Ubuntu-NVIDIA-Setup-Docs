@@ -44,7 +44,7 @@ info "Kernel: $(uname -r)"
 check_and_fix "Arquitectura x86_64" "uname -m | grep -q x86_64"
 
 # --- 2. Preparación del Sistema (Sección 3) ---
-section "2. Preparación del Sistema"
+section "2. Preparación del Sistema" "nvidia-cuda-setup"
 
 check_and_fix "build-essential instalado" \
     "pkg_installed build-essential" \
@@ -112,7 +112,7 @@ check_and_fix "Librerías GStreamer plugins base dev" \
     "fix_apt libgstreamer-plugins-base1.0-dev"
 
 # --- 3. Wayland/Xorg ---
-section "3. Entorno Gráfico"
+section "3. Entorno Gráfico" "workstation-hardening"
 
 session_type="${XDG_SESSION_TYPE:-desconocido}"
 if [ "$session_type" = "x11" ]; then
@@ -133,7 +133,7 @@ target=$(systemctl get-default 2>/dev/null || echo "desconocido")
 info "Target actual: ${target}"
 
 # --- 4. SSH y Firewall ---
-section "4. SSH y Firewall"
+section "4. SSH y Firewall" "workstation-dependencies"
 
 check_and_fix "OpenSSH Server instalado" \
     "pkg_installed openssh-server" \
@@ -147,7 +147,7 @@ if command -v ufw > /dev/null 2>&1; then
 fi
 
 # --- 5. Drivers NVIDIA (Sección 4) ---
-section "5. Drivers NVIDIA"
+section "5. Drivers NVIDIA" "nvidia-cuda-setup"
 
 check_manual "nvidia-smi disponible" \
     "command -v nvidia-smi" \
@@ -189,7 +189,7 @@ check_and_fix_warn "Módulo open/MIT-GPL (recomendado para RTX 20/30/40/50)" \
     "check_nvidia_open_module"
 
 # --- 6. CUDA Toolkit (Sección 5) ---
-section "6. CUDA Toolkit"
+section "6. CUDA Toolkit" "nvidia-cuda-setup"
 
 # Detectar CUDA desde el filesystem si no está en el PATH
 detect_cuda_from_system
@@ -206,12 +206,18 @@ fi
 check_and_fix "PATH incluye CUDA" "echo \"\$PATH\" | grep -qi cuda"
 check_and_fix "LD_LIBRARY_PATH incluye CUDA" "echo \"\${LD_LIBRARY_PATH:-}\" | grep -qi cuda"
 check_and_fix "Configuración CUDA en el sistema" "check_cuda_configured"
-check_manual "CUDA Toolkit en la versión fijada (${CUDA_VERSION_EXPECTED})" \
-    "check_cuda_version" \
-    "La Sección 5 fija CUDA ${CUDA_VERSION_EXPECTED} con el instalador .deb local. Instala solo cuda-toolkit, nunca los metapaquetes cuda ni cuda-drivers."
+check_manual "CUDA Toolkit coherente (nvcc, symlink y paquete en la misma versión)" \
+    "check_cuda_coherente" \
+    "nvcc dice $(cuda_version_nvcc), /usr/local/cuda apunta a $(cuda_version_symlink) y dpkg sostiene: $(cuda_versions_paquete | tr '\n' ' '). Todo lo que corra bajo sudo o como servicio usa el symlink, no tu PATH. Fijalo: sudo update-alternatives --set cuda /usr/local/cuda-VERSION"
+# La versión del manual es la preferida, no la única válida: el instalador .deb
+# 2.9.0+ adopta la que el equipo ya tenga. Se informa, no se reprueba.
+if ! check_cuda_version; then
+    info "CUDA $(cuda_version_en_uso) en uso; la Sección 5 fija la ${CUDA_VERSION_EXPECTED}"
+    info "No es un error mientras todas las fuentes apunten a la misma versión"
+fi
 
 # --- 7. MongoDB (Sección 6) ---
-section "7. MongoDB"
+section "7. MongoDB" "workstation-dependencies"
 
 check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
     "check_kernel_mongodb_ok" \
@@ -248,12 +254,16 @@ if systemctl is-active mongod > /dev/null 2>&1; then
     info "MongoDB: ${mongo_version}"
 fi
 
-check_and_fix_warn "MongoDB Compass instalado" \
-    "command -v mongodb-compass" \
+check_and_fix_warn "MongoDB Compass >= ${MONGODB_COMPASS_VERSION} instalado" \
+    "compass_al_dia" \
     "fix_deb_url '${MONGODB_COMPASS_URL}'"
 
+if command -v mongodb-compass > /dev/null 2>&1; then
+    info "MongoDB Compass: $(dpkg-query -W -f='${Version}' mongodb-compass 2>/dev/null || echo desconocida)"
+fi
+
 # --- 8. EMQX (Sección 6) ---
-section "8. EMQX (Broker MQTT)"
+section "8. EMQX (Broker MQTT)" "workstation-dependencies"
 
 check_and_fix "EMQX instalado" \
     "command -v emqx" \
@@ -273,7 +283,7 @@ if systemctl is-active emqx > /dev/null 2>&1; then
 fi
 
 # --- 9. Golang (Sección 6) ---
-section "9. Golang"
+section "9. Golang" "workstation-dependencies"
 
 check_and_fix "Go instalado" "command -v go" "fix_snap go"
 
@@ -283,7 +293,7 @@ if command -v go > /dev/null 2>&1; then
 fi
 
 # --- 10. Visual Studio Code (Sección 6) ---
-section "10. Visual Studio Code"
+section "10. Visual Studio Code" "workstation-dependencies"
 
 check_and_fix "VSCode instalado" "command -v code" "fix_snap code"
 
@@ -293,7 +303,7 @@ if command -v code > /dev/null 2>&1; then
 fi
 
 # --- 11. GStreamer (Sección 6) ---
-section "11. GStreamer y Plugins"
+section "11. GStreamer y Plugins" "workstation-dependencies"
 
 check_and_fix "GStreamer instalado (gst-launch-1.0)" \
     "command -v gst-launch-1.0" \
@@ -344,7 +354,7 @@ check_and_fix_warn "Plugin NVIDIA (nvh264enc)" "gst-inspect-1.0 nvh264enc"
 check_and_fix_warn "Plugin rtspclientsink" "gst-inspect-1.0 rtspclientsink"
 
 # --- 12. Herramientas de Red y Soporte Remoto (Sección 6) ---
-section "12. Herramientas de Red y Soporte Remoto"
+section "12. Herramientas de Red y Soporte Remoto" "workstation-dependencies"
 
 check_and_fix_warn "Angry IP Scanner instalado" \
     "command -v ipscan" \
@@ -365,7 +375,7 @@ check_and_fix_warn "RustDesk instalado" \
     "fix_deb_url '${RUSTDESK_URL}'"
 
 # --- 13. Puertos (Sección 6) ---
-section "13. Puertos y Conectividad"
+section "13. Puertos y Conectividad" "workstation-hardening"
 
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
@@ -409,7 +419,7 @@ else
 fi
 
 # --- 14. Versión de Ubuntu específica ---
-section "14. Dependencias Específicas por Versión"
+section "14. Dependencias Específicas por Versión" "nvidia-cuda-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
     check_and_fix_warn "libtinfo5 instalado (requerido en 24.04)" \
