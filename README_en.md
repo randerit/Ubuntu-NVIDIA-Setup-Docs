@@ -1889,17 +1889,17 @@ With `--fix`, the script:
 
 The scripts classify results into different levels to make prioritization easier:
 
-| Tag | Level | Description | Example |
-|-----|-------|-------------|---------|
-| `[OK]` | Correct | Component installed and working | build-essential, nvidia-smi, MongoDB |
-| `[FALLO]` | Critical | Essential component missing | System packages, drivers, CUDA |
-| `[AVISO]` | Critical warning | Important optional component missing | Stopped services, remote tools |
-| `[NOTA]` | Minor | Optional configuration not applied | Firewall ports not configured |
-| `[INFO]` | Informational | Detected system data | GPU version, kernel, IP |
+| Tag | Level | Meaning | Example | Blocks the status? |
+|-----|-------|---------|---------|--------------------|
+| `[OK]` | Present | Component installed and working | build-essential, nvidia-smi, MongoDB | — |
+| `[FALLO]` | Necessary | The profile does not work without it | Drivers, CUDA, MongoDB, EMQX, AnyDesk override | Yes (counts for the exit code) |
+| `[AVISO]` | Recommended | Works, but degraded or a real risk | Stopped services, Secure Boot, THP | Yes, for the status only |
+| `[NOTA]` | Optional | Informational; no profile depends on it | Utilities, Go/VS Code, Node-RED, ML stack, RustDesk, ports not configured | No |
+| `[INFO]` | Informational | Detected system data | GPU version, kernel, IP | No |
 
 In the summary:
-- **SALUDABLE:** 0 failures and 0 warnings. Minor notes do not affect the status.
-- **SALUDABLE CON AVISOS:** 0 failures, but critical warnings remain.
+- **SALUDABLE:** 0 necessary and 0 recommended. Optional notes do not affect the status.
+- **SALUDABLE CON AVISOS:** 0 necessary, but recommended items remain.
 - **ATENCIÓN REQUERIDA:** 1-3 failures.
 - **REQUIERE INTERVENCIÓN:** More than 3 failures.
 
