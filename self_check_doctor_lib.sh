@@ -258,7 +258,7 @@ echo "12. libtinfo5: la etiqueta dice quien la instala"
 # La corrida por defecto de nvidia-cuda-setup la instala en 24.04. La
 # etiqueta vieja decia "solo si CUDA la pide", que no era lo que el instalador hace.
 for d in doctor_compresion.sh doctor_analitica.sh; do
-  t "$d: libtinfo5 nombra a nvidia-cuda-setup" 0 grep -qF 'lo instala nvidia-cuda-setup' "$d"
+  t "$d: libtinfo5 nombra a nvidia-cuda-setup" 0 grep -qF 'nvidia-cuda-setup --libtinfo5' "$d"
   t "$d: libtinfo5 ya no dice 'solo si CUDA'" 1 grep -qF 'solo si CUDA' "$d"
 done
 

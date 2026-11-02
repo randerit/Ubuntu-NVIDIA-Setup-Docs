@@ -390,7 +390,7 @@ fi
 section "11. Dependencias Específicas por Versión" "nvidia-cuda-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
-    check_and_fix_nota "libtinfo5 instalado (24.04: lo instala nvidia-cuda-setup en su corrida por defecto; el manual lo marca opcional)" \
+    check_and_fix_nota "libtinfo5 instalado (24.04: nvidia-cuda-setup --libtinfo5, o la entrada 'NVIDIA: libtinfo5' del menu; el manual lo marca opcional)" \
         "pkg_installed libtinfo5" \
         "fix_libtinfo5"
 elif [[ "$ubuntu_version" == "22.04"* ]]; then
