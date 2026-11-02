@@ -44,6 +44,7 @@ LOG_FILE=""
 # --- Componentes que el instalador pudo omitir (--skip-*) ---
 # omnifish-dependencies pasa acá los mismos flags con que se corrió. Un componente
 # omitido no es un fallo del equipo: su bloque se saltea con una línea de INFO.
+# shellcheck disable=SC2034  # los leen los doctores que sourcean esta libreria
 SKIP_MONGODB=false
 SKIP_EMQX=false
 SKIP_SNAPS=false
@@ -84,6 +85,8 @@ parse_args() {
         esac
     done
 
+    leer_respuesta_mongodb
+
     if $FIX_MODE; then
         LOG_FILE="/tmp/doctor_fix_$(date '+%Y%m%d_%H%M%S').log"
         echo -e "${YELLOW}${BOLD}  Modo --fix activado. Se instalarán componentes faltantes.${NC}"
@@ -99,6 +102,22 @@ parse_args() {
         # Actualizar índice de paquetes una vez
         echo -e "  ${INFO} Actualizando índice de paquetes..."
         sudo apt-get update >> "$LOG_FILE" 2>&1
+    fi
+}
+
+# =============================================================================
+# --- Respuesta guardada: ¿este equipo usa MongoDB? ---
+# omnifish-dependencies la pregunta en la instalacion y la guarda como el perfil
+# (/etc/omnifish/mongodb: "si" o "no"). "no" saltea los chequeos de MongoDB; "si"
+# o archivo ausente los corre. El flag --skip-mongodb siempre gana.
+# OMNIFISH_CONF_DIR permite apuntar a otro directorio (pruebas).
+leer_respuesta_mongodb() {
+    local archivo="${OMNIFISH_CONF_DIR:-/etc/omnifish}/mongodb" respuesta=""
+    if [ -r "$archivo" ]; then
+        respuesta=$(tr -d '[:space:]' < "$archivo")
+    fi
+    if [ "$respuesta" = "no" ] && [ "$SKIP_MONGODB" != true ]; then
+        SKIP_MONGODB=true
     fi
 }
 

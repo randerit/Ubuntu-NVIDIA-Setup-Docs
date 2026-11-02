@@ -220,7 +220,7 @@ fi
 section "7. MongoDB" "omnifish-dependencies"
 
 if $SKIP_MONGODB; then
-    info "MongoDB omitido (--skip-mongodb): el chequeo de kernel de MongoDB no aplica"
+    info "MongoDB omitido (este equipo no usa MongoDB): el chequeo de kernel de MongoDB no aplica"
 else
     check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
         "check_kernel_mongodb_ok" \
@@ -239,7 +239,7 @@ check_manual "Sin blacklist de r8169 (mata las RTL8168/8111)" \
     "check_no_r8169_blacklist" \
     "Hay un blacklist de r8169 en /etc/modprobe.d/. Sacalo: mata las RTL8168/8111 y no hace falta, porque el r8169 libera el device cuando no soporta la revision y ahi lo toma el r8125."
 if $SKIP_MONGODB; then
-    info "MongoDB omitido (--skip-mongodb): THP, mongod y autorizacion no aplican"
+    info "MongoDB omitido (este equipo no usa MongoDB): THP, mongod y autorizacion no aplican"
 else
     check_and_fix_warn "Transparent Huge Pages habilitado (MongoDB 8 lo requiere)" \
         "check_thp_enabled"

@@ -262,6 +262,28 @@ for d in doctor_compresion.sh doctor_analitica.sh; do
   t "$d: libtinfo5 ya no dice 'solo si CUDA'" 1 grep -qF 'solo si CUDA' "$d"
 done
 
+echo "13. respuesta guardada sobre MongoDB: el doctor la lee sin preguntar"
+# omnifish-dependencies pregunta una vez por equipo si usa MongoDB y guarda la
+# respuesta en /etc/omnifish/mongodb (si|no), igual que el perfil. El doctor la
+# lee: "no" saltea los chequeos de MongoDB; "si" o ausente los corre.
+# OMNIFISH_CONF_DIR permite apuntar a un directorio de prueba.
+TMP_CONF=$(mktemp -d)
+trap 'rm -rf "$TMP_CONF"' EXIT
+# estado_mongo <respuesta|-> [flags...]: escribe la respuesta (o la borra con -)
+# y devuelve SKIP_MONGODB tal como lo deja parse_args en un doctor nuevo.
+estado_mongo() {
+  local respuesta="$1"; shift
+  if [[ "$respuesta" == "-" ]]; then rm -f "$TMP_CONF/mongodb"; else printf '%s\n' "$respuesta" >"$TMP_CONF/mongodb"; fi
+  OMNIFISH_CONF_DIR="$TMP_CONF" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args "$@"; echo "$SKIP_MONGODB"' _ "$@" 2>/dev/null
+}
+
+[[ "$(estado_mongo no)" == true ]] || { echo "   FALLA: respuesta 'no' no salta MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo si)" == false ]] || { echo "   FALLA: respuesta 'si' no corre MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo -)" == false ]] || { echo "   FALLA: sin respuesta guardada no corre MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo si --skip-mongodb)" == true ]] || { echo "   FALLA: --skip-mongodb no gana sobre una respuesta 'si'"; fallos=$((fallos+1)); }
+t "doctor_lib lee la ruta con OMNIFISH_CONF_DIR" 0 grep -qF 'OMNIFISH_CONF_DIR:-/etc/omnifish' doctor_lib.sh
+t "doctor_lib lee el archivo mongodb" 0 grep -qF '/mongodb"' doctor_lib.sh
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else
