@@ -390,7 +390,7 @@ fi
 section "11. Dependencias Específicas por Versión" "omnifish-nvidia-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
-    check_and_fix_nota "libtinfo5 instalado (24.04: omnifish-nvidia-setup --libtinfo5, o la entrada 'NVIDIA: libtinfo5' del menu; el manual lo marca opcional)" \
+    check_and_fix_nota "libtinfo5 instalado (24.04: opcional; solo si CUDA o una herramienta antigua la pide. Se instala con omnifish-nvidia-setup --libtinfo5)" \
         "pkg_installed libtinfo5" \
         "fix_libtinfo5"
 elif [[ "$ubuntu_version" == "22.04"* ]]; then

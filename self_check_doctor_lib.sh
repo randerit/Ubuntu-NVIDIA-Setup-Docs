@@ -254,12 +254,14 @@ for d in doctor_compresion.sh doctor_analitica.sh; do
   t "$d omite el bloque MongoDB con --skip-mongodb" 0 grep -qF 'if $SKIP_MONGODB; then' "$d"
 done
 
-echo "12. libtinfo5: la etiqueta dice quien la instala"
-# La corrida por defecto de omnifish-nvidia-setup la instala en 24.04. La
-# etiqueta vieja decia "solo si CUDA la pide", que no era lo que el instalador hace.
+echo "12. libtinfo5: la etiqueta dice que es opcional y como se instala"
+# libtinfo5 es opcional (manual). La corrida por defecto ya no la instala: la
+# etiqueta nombra el flag y dice que solo hace falta si CUDA o una herramienta
+# antigua la pide. No debe presentarla como requisito del equipo.
 for d in doctor_compresion.sh doctor_analitica.sh; do
-  t "$d: libtinfo5 nombra a omnifish-nvidia-setup" 0 grep -qF 'omnifish-nvidia-setup --libtinfo5' "$d"
-  t "$d: libtinfo5 ya no dice 'solo si CUDA'" 1 grep -qF 'solo si CUDA' "$d"
+  t "$d: libtinfo5 nombra el flag --libtinfo5" 0 grep -qF 'omnifish-nvidia-setup --libtinfo5' "$d"
+  t "$d: libtinfo5 dice que es opcional" 0 grep -qF 'opcional' "$d"
+  t "$d: libtinfo5 no se presenta como requisito" 1 grep -qiE 'requerid|obligator' <(grep 'libtinfo5 instalado' "$d")
 done
 
 echo "13. respuesta guardada sobre MongoDB: el doctor la lee sin preguntar"
