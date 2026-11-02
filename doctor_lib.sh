@@ -21,6 +21,14 @@ INFO="${CYAN}[INFO]${NC}"
 FIXED="${GREEN}[INSTALADO]${NC}"
 FIX_FAIL="${RED}[NO SE PUDO INSTALAR]${NC}"
 
+# --- Niveles de alerta (un significado por nivel) ---
+#   [OK]    presente.
+#   [FALLO] necesario: el perfil no funciona sin esto. Cuenta para el exit code.
+#   [AVISO] recomendado: funciona, pero degradado o con riesgo real. No bloquea.
+#   [NOTA]  opcional: informativo; ningun perfil depende de esto. No bloquea.
+# El exit code del doctor cuenta solo [FALLO]. Ver check_and_fix (FALLO),
+# check_and_fix_warn (AVISO), check_and_fix_nota (NOTA).
+
 # --- Contadores ---
 total=0
 passed=0
@@ -32,6 +40,17 @@ fixed=0
 # --- Modo de operación ---
 FIX_MODE=false
 LOG_FILE=""
+
+# --- Componentes que el instalador pudo omitir (--skip-*) ---
+# omnifish-dependencies pasa acá los mismos flags con que se corrió. Un componente
+# omitido no es un fallo del equipo: su bloque se saltea con una línea de INFO.
+# shellcheck disable=SC2034  # los leen los doctores que sourcean esta libreria
+SKIP_MONGODB=false
+SKIP_EMQX=false
+SKIP_SNAPS=false
+SKIP_ML=false
+SKIP_NODERED=false
+SKIP_MONGO_AUTH=false
 
 # --- Versiones de paquetes .deb (actualizar cuando cambien) ---
 MONGODB_COMPASS_VERSION="1.49.15"
@@ -51,13 +70,22 @@ parse_args() {
                 FIX_MODE=true
                 shift
                 ;;
+            --skip-mongodb)    SKIP_MONGODB=true;    shift ;;
+            --skip-emqx)       SKIP_EMQX=true;       shift ;;
+            --skip-snaps)      SKIP_SNAPS=true;      shift ;;
+            --skip-ml)         SKIP_ML=true;         shift ;;
+            --skip-nodered)    SKIP_NODERED=true;    shift ;;
+            --skip-mongo-auth) SKIP_MONGO_AUTH=true; shift ;;
             *)
-                echo "Uso: $0 [--fix]"
-                echo "  --fix    Instala componentes faltantes automáticamente"
+                echo "Uso: $0 [--fix] [--skip-mongodb] [--skip-emqx] [--skip-snaps] [--skip-ml] [--skip-nodered] [--skip-mongo-auth]"
+                echo "  --fix              Instala componentes faltantes automáticamente"
+                echo "  --skip-*           Componente que el instalador omitió en este equipo (no se verifica)"
                 exit 1
                 ;;
         esac
     done
+
+    leer_respuesta_mongodb
 
     if $FIX_MODE; then
         LOG_FILE="/tmp/doctor_fix_$(date '+%Y%m%d_%H%M%S').log"
@@ -74,6 +102,22 @@ parse_args() {
         # Actualizar índice de paquetes una vez
         echo -e "  ${INFO} Actualizando índice de paquetes..."
         sudo apt-get update >> "$LOG_FILE" 2>&1
+    fi
+}
+
+# =============================================================================
+# --- Respuesta guardada: ¿este equipo usa MongoDB? ---
+# omnifish-dependencies la pregunta en la instalacion y la guarda como el perfil
+# (/etc/omnifish/mongodb: "si" o "no"). "no" saltea los chequeos de MongoDB; "si"
+# o archivo ausente los corre. El flag --skip-mongodb siempre gana.
+# OMNIFISH_CONF_DIR permite apuntar a otro directorio (pruebas).
+leer_respuesta_mongodb() {
+    local archivo="${OMNIFISH_CONF_DIR:-/etc/omnifish}/mongodb" respuesta=""
+    if [ -r "$archivo" ]; then
+        respuesta=$(tr -d '[:space:]' < "$archivo")
+    fi
+    if [ "$respuesta" = "no" ] && [ "$SKIP_MONGODB" != true ]; then
+        SKIP_MONGODB=true
     fi
 }
 
@@ -168,13 +212,47 @@ check_and_fix_warn() {
                 return 0
             fi
         fi
-        echo -e "\r  ${FIX_FAIL} ${description} (opcional)          "
+        echo -e "\r  ${FIX_FAIL} ${description} (recomendado)          "
         warnings=$((warnings + 1))
         return 1
     fi
 
-    echo -e "  ${WARN} ${description} (opcional)"
+    echo -e "  ${WARN} ${description} (recomendado)"
     warnings=$((warnings + 1))
+    return 1
+}
+
+# check_and_fix_nota - [NOTA]: opcional. Se intenta instalar con --fix, pero que
+# falte no bloquea ni avisa como riesgo. Cuenta en "Notas", no en "Avisos".
+check_and_fix_nota() {
+    local description="$1"
+    local check_cmd="$2"
+    local fix_cmd="${3:-}"
+    total=$((total + 1))
+
+    if eval "$check_cmd" > /dev/null 2>&1; then
+        echo -e "  ${PASS} ${description}"
+        passed=$((passed + 1))
+        return 0
+    fi
+
+    if $FIX_MODE && [ -n "$fix_cmd" ]; then
+        echo -ne "  ${YELLOW}[INSTALANDO]${NC} ${description}..."
+        if run_fix "$fix_cmd"; then
+            if eval "$check_cmd" > /dev/null 2>&1; then
+                echo -e "\r  ${FIXED} ${description}          "
+                fixed=$((fixed + 1))
+                passed=$((passed + 1))
+                return 0
+            fi
+        fi
+        echo -e "\r  ${MINOR} ${description} (opcional, no instalado)          "
+        minors=$((minors + 1))
+        return 1
+    fi
+
+    echo -e "  ${MINOR} ${description} (opcional)"
+    minors=$((minors + 1))
     return 1
 }
 
@@ -810,23 +888,25 @@ print_summary() {
     echo ""
     echo -e "  Total de verificaciones:  ${BOLD}${total}${NC}"
     echo -e "  Correctas:                ${GREEN}${passed}${NC}"
-    echo -e "  Fallidas:                 ${RED}${failed}${NC}"
-    echo -e "  Avisos (críticos):        ${YELLOW}${warnings}${NC}"
-    echo -e "  Notas (menores):          ${CYAN}${minors}${NC}"
+    echo -e "  Necesarias ([FALLO]):     ${RED}${failed}${NC}"
+    echo -e "  Recomendadas ([AVISO]):   ${YELLOW}${warnings}${NC}"
+    echo -e "  Opcionales ([NOTA]):      ${CYAN}${minors}${NC}"
     if $FIX_MODE; then
         echo -e "  Instalados con --fix:     ${GREEN}${fixed}${NC}"
     fi
+    echo ""
+    echo -e "  Niveles: ${RED}[FALLO]${NC} necesario · ${YELLOW}[AVISO]${NC} recomendado · ${CYAN}[NOTA]${NC} opcional (no bloquea)"
     echo ""
 
     if [ "$failed" -eq 0 ] && [ "$warnings" -eq 0 ]; then
         echo -e "  ${GREEN}${BOLD}Estado: SALUDABLE${NC}"
         echo -e "  Todos los componentes de ${station_type} están instalados correctamente."
         if [ "$minors" -gt 0 ]; then
-            echo -e "  ${CYAN}Hay ${minors} nota(s) menor(es) (puertos/configs opcionales).${NC}"
+            echo -e "  ${CYAN}Hay ${minors} nota(s) opcional(es): no bloquean el perfil.${NC}"
         fi
     elif [ "$failed" -eq 0 ]; then
         echo -e "  ${YELLOW}${BOLD}Estado: SALUDABLE CON AVISOS${NC}"
-        echo -e "  Componentes esenciales OK. Revisa los avisos críticos."
+        echo -e "  Lo necesario está OK. Revisa los avisos recomendados."
     elif [ "$failed" -le 3 ]; then
         echo -e "  ${YELLOW}${BOLD}Estado: ATENCIÓN REQUERIDA${NC}"
         echo -e "  Algunos componentes faltan. Revisa los fallos indicados."

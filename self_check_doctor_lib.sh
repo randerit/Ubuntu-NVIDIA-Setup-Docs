@@ -187,6 +187,105 @@ for d in doctor_compresion.sh doctor_analitica.sh; do
     || { echo "   FALLA: $d section 4 debe ser omnifish-dependencies"; fallos=$((fallos+1)); }
 done
 
+echo
+echo "9. cuatro niveles de alerta: significado unico"
+# Cada nivel tiene un simbolo, una etiqueta y un destino en el contador. El exit
+# del doctor cuenta solo lo necesario ([FALLO]); recomendados y opcionales no
+# bloquean. Antes [AVISO] decia "(opcional)" y el resumen lo llamaba "criticos".
+nivel() {  # nivel <funcion> <simbolo> <etiqueta> <contadores esperados>
+  local fn="$1" sym="$2" etq="$3" esperado="$4" out
+  out=$(bash -c "source ./doctor_lib.sh >/dev/null 2>&1; $fn 'X' false; echo \"CNT f=\$failed w=\$warnings m=\$minors\"" 2>&1)
+  if ! grep -q "\[$sym\]" <<<"$out" || ! grep -qF "$etq" <<<"$out" || ! grep -qF "$esperado" <<<"$out"; then
+    echo "   FALLA: $fn no sale como [$sym] '$etq' con $esperado: $(tr '\n' ' ' <<<"$out")"
+    fallos=$((fallos+1))
+  fi
+}
+nivel check_and_fix        FALLO  ""             "CNT f=1 w=0 m=0"
+nivel check_and_fix_warn   AVISO  "(recomendado)" "CNT f=0 w=1 m=0"
+nivel check_and_fix_nota   NOTA   "(opcional)"    "CNT f=0 w=0 m=1"
+t "check_and_fix_nota existe" 0 grep -q '^check_and_fix_nota()' doctor_lib.sh
+t "resumen usa 'Recomendadas ([AVISO])'" 0 grep -qF 'Recomendadas ([AVISO])' doctor_lib.sh
+t "resumen usa 'Opcionales ([NOTA])'" 0 grep -qF 'Opcionales ([NOTA])' doctor_lib.sh
+t "resumen ya no dice 'criticos'" 1 grep -qi 'criticos' doctor_lib.sh
+t "leyenda de los cuatro niveles" 0 bash -c 'grep -q necesario doctor_lib.sh && grep -q recomendado doctor_lib.sh && grep -q opcional doctor_lib.sh'
+t "[AVISO] ya no lleva '(opcional)'" 1 bash -c 'grep -E "check_and_fix_warn " doctor_compresion.sh doctor_analitica.sh | grep -q "opcional"'
+t "ningun [AVISO] escrito a mano dice 'opcional'" 1 bash -c 'grep -E "WARN\}.*opcional" doctor_compresion.sh doctor_analitica.sh | grep -q .'
+t "ningun [NOTA] escrito a mano dice 'recomendado'" 1 bash -c 'grep -E "MINOR\}.*recomendado" doctor_compresion.sh doctor_analitica.sh | grep -q .'
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  t "$d sale con el conteo de fallos, no de avisos" 0 grep -qF 'exit $((failed > 255 ? 1 : failed))' "$d"
+done
+
+echo "10. clasificacion por perfil: cada check en su nivel"
+# Contrato: lo que el perfil no necesita no puede contar como [FALLO]. Las
+# descripciones se buscan por prefijo, con la funcion exacta que las verifica.
+NOTA_COMUN=("htop instalado" "ncdu instalado" "tree instalado" "traceroute instalado"
+            "nmap instalado" "inxi instalado" "net-tools instalado" "lm-sensors instalado"
+            "neofetch instalado" "mesa-utils instalado" "vim instalado"
+            "libtinfo5 instalado")
+NOTA_COMPRESION=("Go instalado" "VSCode instalado" "Angry IP Scanner instalado"
+                 "RustDesk instalado" "MongoDB Compass")
+NOTA_ANALITICA=("pandas instalado" "numpy instalado" "scikit-learn instalado"
+                "paho-mqtt instalado" "ultralytics instalado" "Node-RED instalado"
+                "Servicio nodered activo" "Servicio nodered habilitado al inicio")
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  extra=("${NOTA_COMPRESION[@]}")
+  [[ "$d" == doctor_analitica.sh ]] && extra=("${NOTA_ANALITICA[@]}")
+  for desc in "${NOTA_COMUN[@]}" "${extra[@]}"; do
+    # Si la linea del check no existe, el grep falla y eso tambien es un fallo.
+    grep -qF "check_and_fix_nota \"$desc" "$d" \
+      || { echo "   FALLA: $d: '$desc' no es check_and_fix_nota"; fallos=$((fallos+1)); }
+    grep -qF "check_and_fix \"$desc" "$d" \
+      && { echo "   FALLA: $d: '$desc' sigue como [FALLO]"; fallos=$((fallos+1)); }
+    grep -qF "check_and_fix_warn \"$desc" "$d" \
+      && { echo "   FALLA: $d: '$desc' sigue como [AVISO]"; fallos=$((fallos+1)); }
+  done
+done
+t "libtinfo5 ya no dice 'requerido en 24.04'" 1 grep -qF 'requerido en 24.04' doctor_compresion.sh doctor_analitica.sh
+
+echo "11. --skip-* del perfil: lo que el instalador omitio no cuenta como [FALLO]"
+# omnifish-dependencies pasa a su doctor los mismos --skip-* con que se corrio.
+# Sin esto, un equipo sin EMQX o sin MongoDB sale con fallos que no son suyos.
+t "parse_args acepta --skip-emqx y --skip-mongodb" 0 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-emqx --skip-mongodb && [[ "$SKIP_EMQX" == true && "$SKIP_MONGODB" == true ]]'
+t "parse_args acepta los demas --skip-* de los perfiles" 0 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-snaps --skip-ml --skip-nodered --skip-mongo-auth'
+t "parse_args sigue rechazando un flag desconocido" 1 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-inventado'
+t "doctor_lib define SKIP_EMQX y SKIP_MONGODB por defecto en false" 0 grep -qE '^SKIP_(EMQX|MONGODB)=false' doctor_lib.sh
+t "compresion omite el bloque EMQX con --skip-emqx" 0 grep -qF 'if $SKIP_EMQX; then' doctor_compresion.sh
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  t "$d omite el bloque MongoDB con --skip-mongodb" 0 grep -qF 'if $SKIP_MONGODB; then' "$d"
+done
+
+echo "12. libtinfo5: la etiqueta dice que es opcional y como se instala"
+# libtinfo5 es opcional (manual). La corrida por defecto ya no la instala: la
+# etiqueta nombra el flag y dice que solo hace falta si CUDA o una herramienta
+# antigua la pide. No debe presentarla como requisito del equipo.
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  t "$d: libtinfo5 nombra el flag --libtinfo5" 0 grep -qF 'omnifish-nvidia-setup --libtinfo5' "$d"
+  t "$d: libtinfo5 dice que es opcional" 0 grep -qF 'opcional' "$d"
+  t "$d: libtinfo5 no se presenta como requisito" 1 grep -qiE 'requerid|obligator' <(grep 'libtinfo5 instalado' "$d")
+done
+
+echo "13. respuesta guardada sobre MongoDB: el doctor la lee sin preguntar"
+# omnifish-dependencies pregunta una vez por equipo si usa MongoDB y guarda la
+# respuesta en /etc/omnifish/mongodb (si|no), igual que el perfil. El doctor la
+# lee: "no" saltea los chequeos de MongoDB; "si" o ausente los corre.
+# OMNIFISH_CONF_DIR permite apuntar a un directorio de prueba.
+TMP_CONF=$(mktemp -d)
+trap 'rm -rf "$TMP_CONF"' EXIT
+# estado_mongo <respuesta|-> [flags...]: escribe la respuesta (o la borra con -)
+# y devuelve SKIP_MONGODB tal como lo deja parse_args en un doctor nuevo.
+estado_mongo() {
+  local respuesta="$1"; shift
+  if [[ "$respuesta" == "-" ]]; then rm -f "$TMP_CONF/mongodb"; else printf '%s\n' "$respuesta" >"$TMP_CONF/mongodb"; fi
+  OMNIFISH_CONF_DIR="$TMP_CONF" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args "$@"; echo "$SKIP_MONGODB"' _ "$@" 2>/dev/null
+}
+
+[[ "$(estado_mongo no)" == true ]] || { echo "   FALLA: respuesta 'no' no salta MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo si)" == false ]] || { echo "   FALLA: respuesta 'si' no corre MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo -)" == false ]] || { echo "   FALLA: sin respuesta guardada no corre MongoDB"; fallos=$((fallos+1)); }
+[[ "$(estado_mongo si --skip-mongodb)" == true ]] || { echo "   FALLA: --skip-mongodb no gana sobre una respuesta 'si'"; fallos=$((fallos+1)); }
+t "doctor_lib lee la ruta con OMNIFISH_CONF_DIR" 0 grep -qF 'OMNIFISH_CONF_DIR:-/etc/omnifish' doctor_lib.sh
+t "doctor_lib lee el archivo mongodb" 0 grep -qF '/mongodb"' doctor_lib.sh
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else
