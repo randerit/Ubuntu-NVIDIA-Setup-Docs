@@ -242,6 +242,26 @@ for d in doctor_compresion.sh doctor_analitica.sh; do
 done
 t "libtinfo5 ya no dice 'requerido en 24.04'" 1 grep -qF 'requerido en 24.04' doctor_compresion.sh doctor_analitica.sh
 
+echo "11. --skip-* del perfil: lo que el instalador omitio no cuenta como [FALLO]"
+# workstation-dependencies pasa a su doctor los mismos --skip-* con que se corrio.
+# Sin esto, un equipo sin EMQX o sin MongoDB sale con fallos que no son suyos.
+t "parse_args acepta --skip-emqx y --skip-mongodb" 0 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-emqx --skip-mongodb && [[ "$SKIP_EMQX" == true && "$SKIP_MONGODB" == true ]]'
+t "parse_args acepta los demas --skip-* de los perfiles" 0 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-snaps --skip-ml --skip-nodered --skip-mongo-auth'
+t "parse_args sigue rechazando un flag desconocido" 1 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-inventado'
+t "doctor_lib define SKIP_EMQX y SKIP_MONGODB por defecto en false" 0 grep -qE '^SKIP_(EMQX|MONGODB)=false' doctor_lib.sh
+t "compresion omite el bloque EMQX con --skip-emqx" 0 grep -qF 'if $SKIP_EMQX; then' doctor_compresion.sh
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  t "$d omite el bloque MongoDB con --skip-mongodb" 0 grep -qF 'if $SKIP_MONGODB; then' "$d"
+done
+
+echo "12. libtinfo5: la etiqueta dice quien la instala"
+# La corrida por defecto de nvidia-cuda-setup la instala en 24.04. La
+# etiqueta vieja decia "solo si CUDA la pide", que no era lo que el instalador hace.
+for d in doctor_compresion.sh doctor_analitica.sh; do
+  t "$d: libtinfo5 nombra a nvidia-cuda-setup" 0 grep -qF 'lo instala nvidia-cuda-setup' "$d"
+  t "$d: libtinfo5 ya no dice 'solo si CUDA'" 1 grep -qF 'solo si CUDA' "$d"
+done
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else

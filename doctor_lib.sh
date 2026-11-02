@@ -41,6 +41,16 @@ fixed=0
 FIX_MODE=false
 LOG_FILE=""
 
+# --- Componentes que el instalador pudo omitir (--skip-*) ---
+# workstation-dependencies pasa acá los mismos flags con que se corrió. Un componente
+# omitido no es un fallo del equipo: su bloque se saltea con una línea de INFO.
+SKIP_MONGODB=false
+SKIP_EMQX=false
+SKIP_SNAPS=false
+SKIP_ML=false
+SKIP_NODERED=false
+SKIP_MONGO_AUTH=false
+
 # --- Versiones de paquetes .deb (actualizar cuando cambien) ---
 MONGODB_COMPASS_VERSION="1.49.15"
 MONGODB_COMPASS_URL="https://downloads.mongodb.com/compass/mongodb-compass_${MONGODB_COMPASS_VERSION}_amd64.deb"
@@ -59,9 +69,16 @@ parse_args() {
                 FIX_MODE=true
                 shift
                 ;;
+            --skip-mongodb)    SKIP_MONGODB=true;    shift ;;
+            --skip-emqx)       SKIP_EMQX=true;       shift ;;
+            --skip-snaps)      SKIP_SNAPS=true;      shift ;;
+            --skip-ml)         SKIP_ML=true;         shift ;;
+            --skip-nodered)    SKIP_NODERED=true;    shift ;;
+            --skip-mongo-auth) SKIP_MONGO_AUTH=true; shift ;;
             *)
-                echo "Uso: $0 [--fix]"
-                echo "  --fix    Instala componentes faltantes automáticamente"
+                echo "Uso: $0 [--fix] [--skip-mongodb] [--skip-emqx] [--skip-snaps] [--skip-ml] [--skip-nodered] [--skip-mongo-auth]"
+                echo "  --fix              Instala componentes faltantes automáticamente"
+                echo "  --skip-*           Componente que el instalador omitió en este equipo (no se verifica)"
                 exit 1
                 ;;
         esac

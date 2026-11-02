@@ -219,9 +219,13 @@ fi
 # --- 7. MongoDB (Sección 7) ---
 section "7. MongoDB" "workstation-dependencies"
 
-check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
-    "check_kernel_mongodb_ok" \
-    "Kernel $(uname -r) bloquea el arranque de mongod (SERVER-121912). Aplica la Sección 14 del README: arrancar en un kernel anterior a 6.19 (el 6.8 GA, o el 6.11/6.14 si el equipo ya lo tiene)."
+if $SKIP_MONGODB; then
+    info "MongoDB omitido (--skip-mongodb): el chequeo de kernel de MongoDB no aplica"
+else
+    check_manual "Kernel compatible con MongoDB 8 (fuera de 6.19-7.0.13)" \
+        "check_kernel_mongodb_ok" \
+        "Kernel $(uname -r) bloquea el arranque de mongod (SERVER-121912). Aplica la Sección 14 del README: arrancar en un kernel anterior a 6.19 (el 6.8 GA, o el 6.11/6.14 si el equipo ya lo tiene)."
+fi
 check_manual "Pin del kernel persistente (bloquea 6.19+)" \
     "check_kernel_pin" \
     "Falta el pin. El kernel actual puede ser compatible, pero sin pin un apt upgrade futuro trae el HWE 7.0 y deja el equipo sin base de datos. Aplica el Paso 7 de la Sección 3."
@@ -234,37 +238,41 @@ check_and_fix_warn "Módulos DKMS construidos para el kernel en ejecución" \
 check_manual "Sin blacklist de r8169 (mata las RTL8168/8111)" \
     "check_no_r8169_blacklist" \
     "Hay un blacklist de r8169 en /etc/modprobe.d/. Sacalo: mata las RTL8168/8111 y no hace falta, porque el r8169 libera el device cuando no soporta la revision y ahi lo toma el r8125."
-check_and_fix_warn "Transparent Huge Pages habilitado (MongoDB 8 lo requiere)" \
-    "check_thp_enabled"
+if $SKIP_MONGODB; then
+    info "MongoDB omitido (--skip-mongodb): THP, mongod y autorizacion no aplican"
+else
+    check_and_fix_warn "Transparent Huge Pages habilitado (MongoDB 8 lo requiere)" \
+        "check_thp_enabled"
 
-check_and_fix "MongoDB instalado (mongod)" \
-    "command -v mongod" \
-    "fix_mongodb_repo_and_install"
-check_and_fix "MongoDB Shell (mongosh)" \
-    "command -v mongosh"
-check_and_fix_warn "Servicio mongod activo" \
-    "systemctl is-active mongod" \
-    "fix_mongodb_service"
-check_and_fix_warn "Servicio mongod habilitado al inicio" \
-    "systemctl is-enabled mongod" \
-    "sudo systemctl enable mongod"
+    check_and_fix "MongoDB instalado (mongod)" \
+        "command -v mongod" \
+        "fix_mongodb_repo_and_install"
+    check_and_fix "MongoDB Shell (mongosh)" \
+        "command -v mongosh"
+    check_and_fix_warn "Servicio mongod activo" \
+        "systemctl is-active mongod" \
+        "fix_mongodb_service"
+    check_and_fix_warn "Servicio mongod habilitado al inicio" \
+        "systemctl is-enabled mongod" \
+        "sudo systemctl enable mongod"
 
-if systemctl is-active mongod > /dev/null 2>&1; then
-    mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
-    info "MongoDB: ${mongo_version}"
+    if systemctl is-active mongod > /dev/null 2>&1; then
+        mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
+        info "MongoDB: ${mongo_version}"
 
-    # Verificar si la autorización está habilitada
-    if grep -q "authorization: enabled" /etc/mongod.conf 2>/dev/null; then
-        echo -e "  ${PASS} Autorización habilitada en MongoDB"
-        passed=$((passed + 1))
-        total=$((total + 1))
-    else
-        echo -e "  ${WARN} Autorización NO habilitada en MongoDB (recomendado para producción)"
-        if $FIX_MODE; then
-            echo -e "        ${YELLOW}→ Manual: Edita /etc/mongod.conf y agrega 'authorization: enabled' bajo 'security:'${NC}"
+        # Verificar si la autorización está habilitada
+        if grep -q "authorization: enabled" /etc/mongod.conf 2>/dev/null; then
+            echo -e "  ${PASS} Autorización habilitada en MongoDB"
+            passed=$((passed + 1))
+            total=$((total + 1))
+        else
+            echo -e "  ${WARN} Autorización NO habilitada en MongoDB (recomendado para producción)"
+            if $FIX_MODE; then
+                echo -e "        ${YELLOW}→ Manual: Edita /etc/mongod.conf y agrega 'authorization: enabled' bajo 'security:'${NC}"
+            fi
+            warnings=$((warnings + 1))
+            total=$((total + 1))
         fi
-        warnings=$((warnings + 1))
-        total=$((total + 1))
     fi
 fi
 
@@ -382,7 +390,7 @@ fi
 section "11. Dependencias Específicas por Versión" "nvidia-cuda-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
-    check_and_fix_nota "libtinfo5 instalado (24.04: solo si CUDA o una herramienta antigua lo pide)" \
+    check_and_fix_nota "libtinfo5 instalado (24.04: lo instala nvidia-cuda-setup en su corrida por defecto; el manual lo marca opcional)" \
         "pkg_installed libtinfo5" \
         "fix_libtinfo5"
 elif [[ "$ubuntu_version" == "22.04"* ]]; then
