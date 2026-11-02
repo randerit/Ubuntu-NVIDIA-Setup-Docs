@@ -68,17 +68,17 @@ info "GCC: ${gcc_version}"
 check_and_fix "Git instalado" "command -v git" "fix_apt git"
 check_and_fix "curl instalado" "command -v curl" "fix_apt curl"
 check_and_fix "wget instalado" "command -v wget" "fix_apt wget"
-check_and_fix "vim instalado" "command -v vim" "fix_apt vim"
-check_and_fix "htop instalado" "command -v htop" "fix_apt htop"
-check_and_fix "ncdu instalado" "command -v ncdu" "fix_apt ncdu"
-check_and_fix "tree instalado" "command -v tree" "fix_apt tree"
-check_and_fix "traceroute instalado" "command -v traceroute" "fix_apt traceroute"
-check_and_fix "nmap instalado" "command -v nmap" "fix_apt nmap"
-check_and_fix "inxi instalado" "command -v inxi" "fix_apt inxi"
-check_and_fix "net-tools instalado" "command -v ifconfig" "fix_apt net-tools"
-check_and_fix "lm-sensors instalado" "command -v sensors" "fix_apt lm-sensors"
-check_and_fix "neofetch instalado" "command -v neofetch" "fix_neofetch"
-check_and_fix "mesa-utils instalado" "command -v glxinfo" "fix_apt mesa-utils"
+check_and_fix_nota "vim instalado" "command -v vim" "fix_apt vim"
+check_and_fix_nota "htop instalado" "command -v htop" "fix_apt htop"
+check_and_fix_nota "ncdu instalado" "command -v ncdu" "fix_apt ncdu"
+check_and_fix_nota "tree instalado" "command -v tree" "fix_apt tree"
+check_and_fix_nota "traceroute instalado" "command -v traceroute" "fix_apt traceroute"
+check_and_fix_nota "nmap instalado" "command -v nmap" "fix_apt nmap"
+check_and_fix_nota "inxi instalado" "command -v inxi" "fix_apt inxi"
+check_and_fix_nota "net-tools instalado" "command -v ifconfig" "fix_apt net-tools"
+check_and_fix_nota "lm-sensors instalado" "command -v sensors" "fix_apt lm-sensors"
+check_and_fix_nota "neofetch instalado" "command -v neofetch" "fix_neofetch"
+check_and_fix_nota "mesa-utils instalado" "command -v glxinfo" "fix_apt mesa-utils"
 
 check_and_fix "Librerías OpenGL (libglvnd-dev)" \
     "pkg_installed libglvnd-dev" \
@@ -259,7 +259,7 @@ if systemctl is-active mongod > /dev/null 2>&1; then
         passed=$((passed + 1))
         total=$((total + 1))
     else
-        echo -e "  ${WARN} Autorización NO habilitada en MongoDB (opcional, recomendado para producción)"
+        echo -e "  ${WARN} Autorización NO habilitada en MongoDB (recomendado para producción)"
         if $FIX_MODE; then
             echo -e "        ${YELLOW}→ Manual: Edita /etc/mongod.conf y agrega 'authorization: enabled' bajo 'security:'${NC}"
         fi
@@ -271,13 +271,13 @@ fi
 # --- 8. Node-RED (Sección 7) ---
 section "8. Node-RED" "omnifish-dependencies"
 
-check_and_fix "Node-RED instalado" \
+check_and_fix_nota "Node-RED instalado" \
     "command -v node-red" \
     "fix_nodered"
-check_and_fix_warn "Servicio nodered activo" \
+check_and_fix_nota "Servicio nodered activo" \
     "systemctl is-active nodered" \
     "fix_nodered_service"
-check_and_fix_warn "Servicio nodered habilitado al inicio" \
+check_and_fix_nota "Servicio nodered habilitado al inicio" \
     "systemctl is-enabled nodered" \
     "sudo systemctl enable nodered"
 
@@ -318,19 +318,19 @@ fi
 echo ""
 info "Verificando bibliotecas de Python..."
 
-check_and_fix "pandas instalado" \
+check_and_fix_nota "pandas instalado" \
     "check_pip_package pandas" \
     "fix_pip pandas"
-check_and_fix "numpy instalado" \
+check_and_fix_nota "numpy instalado" \
     "check_pip_package numpy" \
     "fix_pip numpy"
-check_and_fix "scikit-learn instalado" \
+check_and_fix_nota "scikit-learn instalado" \
     "check_pip_package scikit-learn" \
     "fix_pip scikit-learn"
-check_and_fix "paho-mqtt instalado" \
+check_and_fix_nota "paho-mqtt instalado" \
     "check_pip_package paho-mqtt" \
     "fix_pip paho-mqtt"
-check_and_fix "ultralytics instalado" \
+check_and_fix_nota "ultralytics instalado" \
     "check_pip_package ultralytics" \
     "fix_pip ultralytics"
 
@@ -382,7 +382,7 @@ fi
 section "11. Dependencias Específicas por Versión" "omnifish-nvidia-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
-    check_and_fix_warn "libtinfo5 instalado (requerido en 24.04)" \
+    check_and_fix_nota "libtinfo5 instalado (24.04: solo si CUDA o una herramienta antigua lo pide)" \
         "pkg_installed libtinfo5" \
         "fix_libtinfo5"
 elif [[ "$ubuntu_version" == "22.04"* ]]; then

@@ -21,6 +21,14 @@ INFO="${CYAN}[INFO]${NC}"
 FIXED="${GREEN}[INSTALADO]${NC}"
 FIX_FAIL="${RED}[NO SE PUDO INSTALAR]${NC}"
 
+# --- Niveles de alerta (un significado por nivel) ---
+#   [OK]    presente.
+#   [FALLO] necesario: el perfil no funciona sin esto. Cuenta para el exit code.
+#   [AVISO] recomendado: funciona, pero degradado o con riesgo real. No bloquea.
+#   [NOTA]  opcional: informativo; ningun perfil depende de esto. No bloquea.
+# El exit code del doctor cuenta solo [FALLO]. Ver check_and_fix (FALLO),
+# check_and_fix_warn (AVISO), check_and_fix_nota (NOTA).
+
 # --- Contadores ---
 total=0
 passed=0
@@ -168,13 +176,47 @@ check_and_fix_warn() {
                 return 0
             fi
         fi
-        echo -e "\r  ${FIX_FAIL} ${description} (opcional)          "
+        echo -e "\r  ${FIX_FAIL} ${description} (recomendado)          "
         warnings=$((warnings + 1))
         return 1
     fi
 
-    echo -e "  ${WARN} ${description} (opcional)"
+    echo -e "  ${WARN} ${description} (recomendado)"
     warnings=$((warnings + 1))
+    return 1
+}
+
+# check_and_fix_nota - [NOTA]: opcional. Se intenta instalar con --fix, pero que
+# falte no bloquea ni avisa como riesgo. Cuenta en "Notas", no en "Avisos".
+check_and_fix_nota() {
+    local description="$1"
+    local check_cmd="$2"
+    local fix_cmd="${3:-}"
+    total=$((total + 1))
+
+    if eval "$check_cmd" > /dev/null 2>&1; then
+        echo -e "  ${PASS} ${description}"
+        passed=$((passed + 1))
+        return 0
+    fi
+
+    if $FIX_MODE && [ -n "$fix_cmd" ]; then
+        echo -ne "  ${YELLOW}[INSTALANDO]${NC} ${description}..."
+        if run_fix "$fix_cmd"; then
+            if eval "$check_cmd" > /dev/null 2>&1; then
+                echo -e "\r  ${FIXED} ${description}          "
+                fixed=$((fixed + 1))
+                passed=$((passed + 1))
+                return 0
+            fi
+        fi
+        echo -e "\r  ${MINOR} ${description} (opcional, no instalado)          "
+        minors=$((minors + 1))
+        return 1
+    fi
+
+    echo -e "  ${MINOR} ${description} (opcional)"
+    minors=$((minors + 1))
     return 1
 }
 
@@ -810,23 +852,25 @@ print_summary() {
     echo ""
     echo -e "  Total de verificaciones:  ${BOLD}${total}${NC}"
     echo -e "  Correctas:                ${GREEN}${passed}${NC}"
-    echo -e "  Fallidas:                 ${RED}${failed}${NC}"
-    echo -e "  Avisos (críticos):        ${YELLOW}${warnings}${NC}"
-    echo -e "  Notas (menores):          ${CYAN}${minors}${NC}"
+    echo -e "  Necesarias ([FALLO]):     ${RED}${failed}${NC}"
+    echo -e "  Recomendadas ([AVISO]):   ${YELLOW}${warnings}${NC}"
+    echo -e "  Opcionales ([NOTA]):      ${CYAN}${minors}${NC}"
     if $FIX_MODE; then
         echo -e "  Instalados con --fix:     ${GREEN}${fixed}${NC}"
     fi
+    echo ""
+    echo -e "  Niveles: ${RED}[FALLO]${NC} necesario · ${YELLOW}[AVISO]${NC} recomendado · ${CYAN}[NOTA]${NC} opcional (no bloquea)"
     echo ""
 
     if [ "$failed" -eq 0 ] && [ "$warnings" -eq 0 ]; then
         echo -e "  ${GREEN}${BOLD}Estado: SALUDABLE${NC}"
         echo -e "  Todos los componentes de ${station_type} están instalados correctamente."
         if [ "$minors" -gt 0 ]; then
-            echo -e "  ${CYAN}Hay ${minors} nota(s) menor(es) (puertos/configs opcionales).${NC}"
+            echo -e "  ${CYAN}Hay ${minors} nota(s) opcional(es): no bloquean el perfil.${NC}"
         fi
     elif [ "$failed" -eq 0 ]; then
         echo -e "  ${YELLOW}${BOLD}Estado: SALUDABLE CON AVISOS${NC}"
-        echo -e "  Componentes esenciales OK. Revisa los avisos críticos."
+        echo -e "  Lo necesario está OK. Revisa los avisos recomendados."
     elif [ "$failed" -le 3 ]; then
         echo -e "  ${YELLOW}${BOLD}Estado: ATENCIÓN REQUERIDA${NC}"
         echo -e "  Algunos componentes faltan. Revisa los fallos indicados."

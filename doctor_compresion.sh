@@ -68,17 +68,17 @@ info "GCC: ${gcc_version}"
 check_and_fix "Git instalado" "command -v git" "fix_apt git"
 check_and_fix "curl instalado" "command -v curl" "fix_apt curl"
 check_and_fix "wget instalado" "command -v wget" "fix_apt wget"
-check_and_fix "vim instalado" "command -v vim" "fix_apt vim"
-check_and_fix "htop instalado" "command -v htop" "fix_apt htop"
-check_and_fix "ncdu instalado" "command -v ncdu" "fix_apt ncdu"
-check_and_fix "tree instalado" "command -v tree" "fix_apt tree"
-check_and_fix "traceroute instalado" "command -v traceroute" "fix_apt traceroute"
-check_and_fix "nmap instalado" "command -v nmap" "fix_apt nmap"
-check_and_fix "inxi instalado" "command -v inxi" "fix_apt inxi"
-check_and_fix "net-tools instalado" "command -v ifconfig" "fix_apt net-tools"
-check_and_fix "lm-sensors instalado" "command -v sensors" "fix_apt lm-sensors"
-check_and_fix "neofetch instalado" "command -v neofetch" "fix_neofetch"
-check_and_fix "mesa-utils instalado" "command -v glxinfo" "fix_apt mesa-utils"
+check_and_fix_nota "vim instalado" "command -v vim" "fix_apt vim"
+check_and_fix_nota "htop instalado" "command -v htop" "fix_apt htop"
+check_and_fix_nota "ncdu instalado" "command -v ncdu" "fix_apt ncdu"
+check_and_fix_nota "tree instalado" "command -v tree" "fix_apt tree"
+check_and_fix_nota "traceroute instalado" "command -v traceroute" "fix_apt traceroute"
+check_and_fix_nota "nmap instalado" "command -v nmap" "fix_apt nmap"
+check_and_fix_nota "inxi instalado" "command -v inxi" "fix_apt inxi"
+check_and_fix_nota "net-tools instalado" "command -v ifconfig" "fix_apt net-tools"
+check_and_fix_nota "lm-sensors instalado" "command -v sensors" "fix_apt lm-sensors"
+check_and_fix_nota "neofetch instalado" "command -v neofetch" "fix_neofetch"
+check_and_fix_nota "mesa-utils instalado" "command -v glxinfo" "fix_apt mesa-utils"
 
 check_and_fix "Librerías OpenGL (libglvnd-dev)" \
     "pkg_installed libglvnd-dev" \
@@ -254,7 +254,7 @@ if systemctl is-active mongod > /dev/null 2>&1; then
     info "MongoDB: ${mongo_version}"
 fi
 
-check_and_fix_warn "MongoDB Compass >= ${MONGODB_COMPASS_VERSION} instalado" \
+check_and_fix_nota "MongoDB Compass >= ${MONGODB_COMPASS_VERSION} instalado" \
     "compass_al_dia" \
     "fix_deb_url '${MONGODB_COMPASS_URL}'"
 
@@ -285,7 +285,7 @@ fi
 # --- 9. Golang (Sección 6) ---
 section "9. Golang" "omnifish-dependencies"
 
-check_and_fix "Go instalado" "command -v go" "fix_snap go"
+check_and_fix_nota "Go instalado" "command -v go" "fix_snap go"
 
 if command -v go > /dev/null 2>&1; then
     go_version=$(go version 2>/dev/null || echo "desconocida")
@@ -295,7 +295,7 @@ fi
 # --- 10. Visual Studio Code (Sección 6) ---
 section "10. Visual Studio Code" "omnifish-dependencies"
 
-check_and_fix "VSCode instalado" "command -v code" "fix_snap code"
+check_and_fix_nota "VSCode instalado" "command -v code" "fix_snap code"
 
 if command -v code > /dev/null 2>&1; then
     code_version=$(code --version 2>/dev/null | head -1 || echo "desconocida")
@@ -356,7 +356,7 @@ check_and_fix_warn "Plugin rtspclientsink" "gst-inspect-1.0 rtspclientsink"
 # --- 12. Herramientas de Red y Soporte Remoto (Sección 6) ---
 section "12. Herramientas de Red y Soporte Remoto" "omnifish-dependencies"
 
-check_and_fix_warn "Angry IP Scanner instalado" \
+check_and_fix_nota "Angry IP Scanner instalado" \
     "command -v ipscan" \
     "fix_deb_url '${IPSCAN_URL}'"
 check_and_fix_warn "AnyDesk instalado" \
@@ -370,7 +370,7 @@ check_and_fix "AnyDesk con override X11 (obligatorio, Sección 6 Paso 2)" \
 check_and_fix_warn "Servicio AnyDesk activo" \
     "systemctl is-active anydesk" \
     "sudo systemctl restart anydesk"
-check_and_fix_warn "RustDesk instalado" \
+check_and_fix_nota "RustDesk instalado" \
     "command -v rustdesk" \
     "fix_deb_url '${RUSTDESK_URL}'"
 
@@ -422,7 +422,7 @@ fi
 section "14. Dependencias Específicas por Versión" "omnifish-nvidia-setup"
 
 if [[ "$ubuntu_version" == "24.04"* ]]; then
-    check_and_fix_warn "libtinfo5 instalado (requerido en 24.04)" \
+    check_and_fix_nota "libtinfo5 instalado (24.04: solo si CUDA o una herramienta antigua lo pide)" \
         "pkg_installed libtinfo5" \
         "fix_libtinfo5"
 elif [[ "$ubuntu_version" == "22.04"* ]]; then
