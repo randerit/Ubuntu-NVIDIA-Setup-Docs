@@ -238,61 +238,12 @@ check_and_fix_warn "Módulos DKMS construidos para el kernel en ejecución" \
 check_manual "Sin blacklist de r8169 (mata las RTL8168/8111)" \
     "check_no_r8169_blacklist" \
     "Hay un blacklist de r8169 en /etc/modprobe.d/. Sacalo: mata las RTL8168/8111 y no hace falta, porque el r8169 libera el device cuando no soporta la revision y ahi lo toma el r8125."
-if $SKIP_MONGODB; then
-    info "MongoDB omitido (este equipo no usa MongoDB): THP y mongod no aplican a este equipo"
-else
-    check_and_fix_warn "Transparent Huge Pages habilitado (MongoDB 8 lo requiere)" \
-        "check_thp_enabled"
-
-    check_and_fix "MongoDB instalado (mongod)" \
-        "command -v mongod" \
-        "fix_mongodb_repo_and_install"
-    check_and_fix "MongoDB Shell (mongosh)" \
-        "command -v mongosh"
-    check_and_fix_warn "Servicio mongod activo" \
-        "systemctl is-active mongod" \
-        "fix_mongodb_service"
-    check_and_fix_warn "Servicio mongod habilitado al inicio" \
-        "systemctl is-enabled mongod" \
-        "sudo systemctl enable mongod"
-
-    if systemctl is-active mongod > /dev/null 2>&1; then
-        mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
-        info "MongoDB: ${mongo_version}"
-    fi
-
-    check_and_fix_nota "MongoDB Compass >= ${MONGODB_COMPASS_VERSION} instalado" \
-        "compass_al_dia" \
-        "fix_deb_url '${MONGODB_COMPASS_URL}'"
-
-    if command -v mongodb-compass > /dev/null 2>&1; then
-        info "MongoDB Compass: $(dpkg-query -W -f='${Version}' mongodb-compass 2>/dev/null || echo desconocida)"
-    fi
-fi
+check_bloque_mongodb
 
 # --- 8. EMQX (Sección 6) ---
 section "8. EMQX (Broker MQTT)" "workstation-dependencies"
 
-if $SKIP_EMQX; then
-    info "EMQX omitido (--skip-emqx): este equipo no lo instala"
-else
-    check_and_fix "EMQX instalado" \
-        "command -v emqx" \
-        "fix_emqx_repo_and_install"
-    check_and_fix "/etc/emqx/acl.conf presente" \
-        "test -f /etc/emqx/acl.conf" \
-        "fix_emqx_acl"
-    check_and_fix_warn "Servicio EMQX activo" \
-        "systemctl is-active emqx" \
-        "fix_emqx_service"
-    check_and_fix_warn "Servicio EMQX habilitado al inicio" \
-        "systemctl is-enabled emqx" \
-        "sudo systemctl enable emqx"
-
-    if systemctl is-active emqx > /dev/null 2>&1; then
-        info "Dashboard EMQX: http://localhost:18083"
-    fi
-fi
+check_bloque_emqx
 
 # --- 9. Golang (Sección 6) ---
 section "9. Golang" "workstation-dependencies"
@@ -371,17 +322,7 @@ section "12. Herramientas de Red y Soporte Remoto" "workstation-dependencies"
 check_and_fix_nota "Angry IP Scanner instalado" \
     "command -v ipscan" \
     "fix_deb_url '${IPSCAN_URL}'"
-check_and_fix_warn "AnyDesk instalado" \
-    "command -v anydesk" \
-    "fix_anydesk_repo_and_install"
-check_and_fix "AnyDesk con override X11 (obligatorio, Sección 6 Paso 2)" \
-    "check_anydesk_override" \
-    "fix_anydesk_override"
-# El override se aplica sobre la unit, pero la unit puede estar muerta: un
-# paquete instalado y un override correcto no son un AnyDesk que conecte.
-check_and_fix_warn "Servicio AnyDesk activo" \
-    "systemctl is-active anydesk" \
-    "sudo systemctl restart anydesk"
+check_bloque_anydesk
 check_and_fix_nota "RustDesk instalado" \
     "command -v rustdesk" \
     "fix_deb_url '${RUSTDESK_URL}'"
@@ -392,40 +333,14 @@ section "13. Puertos y Conectividad" "workstation-hardening"
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
 
-# Una sola llamada a ufw, capturada en variable. Pasarle la salida de ufw a un
-# "grep -q" por pipe es un falso negativo con muchas reglas: grep -q corta el
-# pipe, ufw muere con SIGPIPE y pipefail propaga el 141. De paso, evita diez
-# sudo seguidos.
-UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
+ufw_capturar_estado
 if grep -q "active" <<<"$UFW_STATUS"; then
     info "Verificando reglas de firewall..."
-    check_and_fix_minor "Puerto SSH (22) configurado" \
-        "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow ssh"
-    check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 27017/tcp"
-    check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
-        "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 1883/tcp"
-    check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
-        "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 18083/tcp"
+    check_puertos_ufw_base
     check_and_fix_minor "Puerto GStreamer RTSP (554) configurado" \
         "grep -qE '(^|[^0-9])554(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 554/tcp && sudo ufw allow 554/udp"
-    check_and_fix_minor "Puerto AnyDesk HTTP (80) configurado" \
-        "grep -qE '(^|[^0-9])80(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 80/tcp"
-    check_and_fix_minor "Puerto AnyDesk HTTPS (443) configurado" \
-        "grep -qE '(^|[^0-9])443(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 443/tcp"
-    check_and_fix_minor "Puerto AnyDesk (6568) configurado" \
-        "grep -qE '(^|[^0-9])6568(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 6568/tcp"
-    check_and_fix_minor "Puerto AnyDesk UDP (50001-50003) configurado" \
-        "grep -qE '(^|[^0-9])50001(/|[^0-9]|\$|:)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 50001:50003/udp"
+    check_puertos_ufw_anydesk
 else
     info "UFW no activo, omitiendo verificación de puertos"
 fi
