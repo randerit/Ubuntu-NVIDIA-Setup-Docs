@@ -1942,11 +1942,12 @@ In the summary:
 - Workstation that opens the web UIs and views the software; it carries dev tools in case they are needed on site
 - MongoDB and MongoDB Compass (no authorization), EMQX, MQTTX, Docker, ffmpeg, AnyDesk with its X11 override, Golang and Visual Studio Code
 - No GStreamer (runtime), RustDesk, Angry IP, ML stack or Node-RED
-- Accepts `--skip-mongodb`, `--skip-emqx` and `--skip-snaps`: what was skipped is reported as `[INFO]`, not `[FALLO]`
+- Accepts `--skip-mongodb`, `--skip-emqx` and `--skip-snaps`: what was skipped is reported as `[INFO]`, not `[FALLO]`; the matching firewall ports are not checked (or opened with `--fix`) either: 27017 with `--skip-mongodb`, 1883 and 18083 with `--skip-emqx`
 - Ports: 22 (SSH), 27017 (MongoDB), 1883 and 18083 (EMQX), AnyDesk (80, 443, 6568, 50001-50003/udp); no RTSP 554 or Node-RED 1880
 
 ### Troubleshooting
 - **The script fails to start:** Verify that `doctor_lib.sh` is in the same directory.
+- **"UFW not active, skipping port verification":** The doctors read the firewall with `LC_ALL=C` (`sudo env LC_ALL=C ufw status`) and only a `Status: active` line counts as active, so the system language does not matter. `Status: inactive` skips the port checks; enable UFW (Section 3) for them to run.
 - **`--fix` does not install something:** Review the log in `/tmp/doctor_fix_*.log` for the exact error.
 - **Python package not detected:** The script uses `pip3 show`, which is more robust than `import`. If it fails, verify with `pip3 list | grep <package>`.
 - **NVIDIA module not detected:** The script checks through `lsmod`, `/proc/driver/nvidia/version`, and `nvidia-smi` as fallback. If all fail, verify that the driver is installed correctly.

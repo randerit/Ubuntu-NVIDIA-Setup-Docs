@@ -908,6 +908,7 @@ check_bloque_mongodb() {
             "sudo systemctl enable mongod"
 
         if systemctl is-active mongod > /dev/null 2>&1; then
+            local mongo_version
             mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
             info "MongoDB: ${mongo_version}"
         fi
@@ -965,25 +966,41 @@ check_bloque_anydesk() {
 # doctor): pasarle la salida de ufw a un "grep -q" por pipe es un falso negativo
 # con muchas reglas, porque grep -q corta el pipe, ufw muere con SIGPIPE y
 # pipefail propaga el 141. De paso, evita diez sudo seguidos.
+# Se consulta con LC_ALL=C: ufw traduce su salida ("Estado: activo" en espanol) y
+# los chequeos de abajo leen "Status: active". "sudo env" y no "LC_ALL=C sudo":
+# el env_reset de sudo puede descartar la variable antes de llegar a ufw.
 ufw_capturar_estado() {
     # shellcheck disable=SC2034  # lo leen check_puertos_ufw_* via eval
-    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
+    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo env LC_ALL=C ufw status 2>/dev/null || true)
 }
 
-# SSH, MongoDB y EMQX (MQTT y Dashboard).
+# Firewall activo? Cuenta solo la linea de estado: "Status: inactive" o
+# una captura vacia no son activo, y un "active" suelto en otra linea tampoco.
+ufw_esta_activo() {
+    grep -q '^Status: active' <<<"$UFW_STATUS"
+}
+
+# SSH siempre; MongoDB y EMQX (MQTT y Dashboard) solo si el equipo los tiene: con
+# --skip-mongodb / --skip-emqx el puerto no se verifica ni, con --fix, se abre.
+# No se imprime nada por lo omitido: check_bloque_mongodb / check_bloque_emqx ya
+# avisaron que ese componente no aplica.
 check_puertos_ufw_base() {
     check_and_fix_minor "Puerto SSH (22) configurado" \
         "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow ssh"
-    check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 27017/tcp"
-    check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
-        "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 1883/tcp"
-    check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
-        "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 18083/tcp"
+    if ! $SKIP_MONGODB; then
+        check_and_fix_minor "Puerto MongoDB (27017) configurado" \
+            "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 27017/tcp"
+    fi
+    if ! $SKIP_EMQX; then
+        check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
+            "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 1883/tcp"
+        check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
+            "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 18083/tcp"
+    fi
 }
 
 # AnyDesk: HTTP, HTTPS, el puerto propio y el rango UDP.

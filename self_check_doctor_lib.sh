@@ -352,6 +352,108 @@ for c in "(554)" "(50001-50003)" "AnyDesk con override X11" "EMQX instalado" "Mo
   tiene 0 "compresion conserva sus checks compartidos" "$COMP_FULL" "$c"
 done
 
+echo "15. UFW: puertos de lo omitido y deteccion del firewall activo"
+# Dos defectos del bloque de puertos: (1) --skip-mongodb / --skip-emqx dejaban el
+# doctor verificando (y con --fix abriendo) 27017/1883/18083 de un componente que
+# el equipo no tiene; (2) "grep -q active" tambien acepta "Status: inactive", y
+# con el idioma del sistema en espanol ufw dice "Estado: activo", asi que un
+# firewall activo tampoco se reconocia. ufw se consulta con LC_ALL=C via "sudo
+# env" (env_reset de sudo puede descartar la variable) y el test se ancla a la
+# linea de estado.
+STUBS15="$TMP/stubs15"
+mkdir -p "$STUBS15"
+# sudo falso que descarta el idioma como hace env_reset: solo "sudo env LC_ALL=C"
+# lo recupera. ufw falso: responde en espanol salvo bajo LC_ALL=C y registra cada
+# regla que se le pide abrir.
+printf '#!/bin/sh\nexec env -u LC_ALL -u LANG -u LANGUAGE "$@"\n' >"$STUBS15/sudo"
+cat >"$STUBS15/ufw" <<'EOF'
+#!/bin/sh
+case "$1" in
+  status)
+    if [ "$UFW_FAKE" = inactive ]; then
+      [ "$LC_ALL" = C ] && echo "Status: inactive" || echo "Estado: inactivo"
+      exit 0
+    fi
+    [ "$LC_ALL" = C ] && echo "Status: active" || echo "Estado: activo"
+    for p in 22 27017 1883 18083 554 1880 80 443 6568 50001:50003; do echo "$p ALLOW Anywhere"; done
+    ;;
+  *) echo "$*" >>"$UFW_LOG" ;;
+esac
+EOF
+cp "$STUBS/ping" "$STUBS15/ping"; cp "$STUBS/ping" "$STUBS15/host"
+chmod +x "$STUBS15"/*
+
+# puertos_base <skip_mongodb> <skip_emqx>: check_puertos_ufw_base con --fix y un
+# UFW_STATUS vacio (falta todo). Imprime la salida y, despues, las reglas que se
+# intentaron abrir.
+puertos_base() {
+  local log="$TMP/ufw15.log"; : >"$log"
+  PATH="$STUBS15:$PATH" UFW_LOG="$log" bash -c '
+    source ./doctor_lib.sh >/dev/null 2>&1
+    SKIP_MONGODB=$1; SKIP_EMQX=$2; FIX_MODE=true; LOG_FILE=/dev/null
+    UFW_STATUS=""
+    check_puertos_ufw_base' _ "$1" "$2" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+  echo "ABIERTOS: $(tr '\n' ' ' <"$log")"
+}
+B_NADA=$(puertos_base false false)
+B_MONGO=$(puertos_base true false)
+B_EMQX=$(puertos_base false true)
+B_AMBOS=$(puertos_base true true)
+tiene 0 "sin skips se verifica y abre 27017" "$B_NADA" "allow 27017/tcp"
+tiene 0 "sin skips se verifica y abre 1883" "$B_NADA" "allow 1883/tcp"
+tiene 0 "sin skips se verifica y abre 18083" "$B_NADA" "allow 18083/tcp"
+tiene 1 "--skip-mongodb no verifica 27017" "$B_MONGO" "(27017)"
+tiene 1 "--skip-mongodb no abre 27017" "$B_MONGO" "27017"
+tiene 0 "--skip-mongodb sigue con EMQX 1883" "$B_MONGO" "allow 1883/tcp"
+tiene 0 "--skip-mongodb sigue con EMQX 18083" "$B_MONGO" "allow 18083/tcp"
+tiene 1 "--skip-emqx no verifica 1883" "$B_EMQX" "(1883)"
+tiene 1 "--skip-emqx no verifica 18083" "$B_EMQX" "(18083)"
+tiene 1 "--skip-emqx no abre 1883" "$B_EMQX" "allow 1883/tcp"
+tiene 1 "--skip-emqx no abre 18083" "$B_EMQX" "allow 18083/tcp"
+tiene 0 "--skip-emqx sigue con MongoDB 27017" "$B_EMQX" "allow 27017/tcp"
+tiene 0 "ambos skips: SSH 22 se sigue verificando" "$B_AMBOS" "(22)"
+tiene 0 "ambos skips: SSH 22 se sigue abriendo" "$B_AMBOS" "allow ssh"
+tiene 1 "ambos skips: ningun puerto de MongoDB/EMQX" "$B_AMBOS" "(27017)"
+tiene 1 "ambos skips: ni 1883" "$B_AMBOS" "1883"
+tiene 1 "ambos skips: ni 18083" "$B_AMBOS" "18083"
+
+# ufw_esta_activo: solo la linea de estado "Status: active" vale.
+activo() {  # activo <estado>
+  bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; UFW_STATUS=$1; ufw_esta_activo' _ "$1" >/dev/null 2>&1
+}
+activo $'Status: active\n22 ALLOW Anywhere'    || { echo "   FALLA: 'Status: active' no se reconoce como activo"; fallos=$((fallos+1)); }
+activo $'Status: active (logging on)\nx'       || { echo "   FALLA: 'Status: active' con sufijo no se reconoce como activo"; fallos=$((fallos+1)); }
+! activo "Status: inactive"                    || { echo "   FALLA: 'Status: inactive' se toma por activo"; fallos=$((fallos+1)); }
+! activo ""                                    || { echo "   FALLA: un estado vacio se toma por activo"; fallos=$((fallos+1)); }
+! activo $'Status: inactive\n22 ALLOW active'  || { echo "   FALLA: 'active' en otra linea se toma por activo"; fallos=$((fallos+1)); }
+
+# ufw_capturar_estado: en un sistema en espanol (sudo descarta LC_ALL) igual
+# tiene que leer "Status: active".
+t "ufw_capturar_estado lee el estado en C aunque el sistema no este en C" 0 \
+  env PATH="$STUBS15:$PATH" LC_ALL=C.UTF-8 LANG=C.UTF-8 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado con firewall inactivo no lo da por activo" 1 \
+  env PATH="$STUBS15:$PATH" UFW_FAKE=inactive LC_ALL=C.UTF-8 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+
+# Los tres doctores completos, con ufw/sudo falsos en espanol.
+STUBS_ANT="$STUBS"; STUBS="$STUBS15"
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
+  S_ACT=$(LC_ALL=C.UTF-8 doctor_salida "$d")
+  tiene 0 "$d: firewall activo (sistema en espanol) verifica los puertos" "$S_ACT" "Verificando reglas de firewall"
+  tiene 1 "$d: firewall activo no dice 'UFW no activo'" "$S_ACT" "UFW no activo"
+  S_INA=$(UFW_FAKE=inactive LC_ALL=C.UTF-8 doctor_salida "$d")
+  tiene 0 "$d: firewall inactivo omite los puertos" "$S_INA" "UFW no activo"
+  tiene 1 "$d: firewall inactivo no verifica puertos" "$S_INA" "Verificando reglas de firewall"
+done
+A_SKIP=$(doctor_salida doctor_analitica.sh --skip-mongodb)
+tiene 1 "analitica con --skip-mongodb no verifica el puerto 27017" "$A_SKIP" "(27017)"
+tiene 0 "analitica con --skip-mongodb sigue verificando 1880" "$A_SKIP" "(1880)"
+C_SKIP=$(doctor_salida doctor_compresion.sh --skip-mongodb --skip-emqx)
+for p in "(27017)" "(1883)" "(18083)"; do
+  tiene 1 "compresion con --skip-mongodb --skip-emqx no verifica" "$C_SKIP" "$p"
+done
+tiene 0 "compresion con skips sigue verificando RTSP 554" "$C_SKIP" "(554)"
+STUBS="$STUBS_ANT"
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else

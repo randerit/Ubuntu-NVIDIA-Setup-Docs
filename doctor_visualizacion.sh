@@ -238,7 +238,7 @@ check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
 
 ufw_capturar_estado
-if grep -q "active" <<<"$UFW_STATUS"; then
+if ufw_esta_activo; then
     info "Verificando reglas de firewall..."
     check_puertos_ufw_base
     check_puertos_ufw_anydesk

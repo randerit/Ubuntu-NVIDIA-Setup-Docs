@@ -366,19 +366,19 @@ section "10. Puertos y Conectividad" "workstation-hardening"
 check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
 
-# Una sola llamada a ufw, capturada en variable. Pasarle la salida de ufw a un
-# "grep -q" por pipe es un falso negativo con muchas reglas: grep -q corta el
-# pipe, ufw muere con SIGPIPE y pipefail propaga el 141. De paso, evita diez
-# sudo seguidos.
-UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
-if grep -q "active" <<<"$UFW_STATUS"; then
+# Una sola llamada a ufw (en idioma C), capturada en UFW_STATUS: ver
+# ufw_capturar_estado en doctor_lib.sh.
+ufw_capturar_estado
+if ufw_esta_activo; then
     info "Verificando reglas de firewall..."
     check_and_fix_minor "Puerto SSH (22) configurado" \
         "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow ssh"
-    check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 27017/tcp"
+    if ! $SKIP_MONGODB; then
+        check_and_fix_minor "Puerto MongoDB (27017) configurado" \
+            "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 27017/tcp"
+    fi
     check_and_fix_minor "Puerto Node-RED (1880) configurado" \
         "grep -qE '(^|[^0-9])1880(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 1880/tcp"
