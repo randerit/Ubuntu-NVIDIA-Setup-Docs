@@ -383,7 +383,7 @@ if ufw_esta_activo; then
         "grep -qE '(^|[^0-9])1880(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow 1880/tcp"
 else
-    info "UFW no activo, omitiendo verificación de puertos"
+    ufw_informar_no_activo
 fi
 
 # --- 11. Versión de Ubuntu específica ---

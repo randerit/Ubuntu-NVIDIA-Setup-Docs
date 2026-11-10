@@ -967,17 +967,35 @@ check_bloque_anydesk() {
 # con muchas reglas, porque grep -q corta el pipe, ufw muere con SIGPIPE y
 # pipefail propaga el 141. De paso, evita diez sudo seguidos.
 # Se consulta con LC_ALL=C: ufw traduce su salida ("Estado: activo" en espanol) y
-# los chequeos de abajo leen "Status: active". "sudo env" y no "LC_ALL=C sudo":
-# el env_reset de sudo puede descartar la variable antes de llegar a ufw.
+# los chequeos de abajo leen "Status: active". Es "LC_ALL=C sudo ufw" y no
+# "sudo env LC_ALL=C ufw": con "env" sudo compara el comando "env" contra el
+# sudoers, y un equipo que solo permite ufw lo rechazaria. sudo conserva LC_*
+# bajo env_reset por su tabla env_check (mientras el valor no lleve "/" ni "%"),
+# asi que ufw igual lo recibe. Si sudo falla (sin permiso, pide clave) la captura
+# queda vacia: ufw_informar_no_activo lo distingue de un firewall inactivo.
 ufw_capturar_estado() {
     # shellcheck disable=SC2034  # lo leen check_puertos_ufw_* via eval
-    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo env LC_ALL=C ufw status 2>/dev/null || true)
+    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && LC_ALL=C sudo ufw status 2>/dev/null || true)
 }
 
 # Firewall activo? Cuenta solo la linea de estado: "Status: inactive" o
 # una captura vacia no son activo, y un "active" suelto en otra linea tampoco.
 ufw_esta_activo() {
     grep -q '^Status: active' <<<"$UFW_STATUS"
+}
+
+# Rama "no activo" de los tres doctores. Con ufw instalado y la captura vacia no se
+# sabe si el firewall esta activo (sudo fallo): un [AVISO] y no un "UFW no activo"
+# silencioso que saltee los puertos como si no hubiera nada que verificar. [AVISO]
+# y no [FALLO]: no se pudo comprobar, no es que falte algo; no cambia el exit code.
+ufw_informar_no_activo() {
+    if [ -z "$UFW_STATUS" ] && command -v ufw > /dev/null 2>&1; then
+        total=$((total + 1))
+        warnings=$((warnings + 1))
+        echo -e "  ${WARN} No se pudo leer el estado de UFW (sudo ufw status falló); puertos sin verificar"
+    else
+        info "UFW no activo, omitiendo verificación de puertos"
+    fi
 }
 
 # SSH siempre; MongoDB y EMQX (MQTT y Dashboard) solo si el equipo los tiene: con

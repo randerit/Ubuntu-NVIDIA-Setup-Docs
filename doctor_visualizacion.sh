@@ -243,7 +243,7 @@ if ufw_esta_activo; then
     check_puertos_ufw_base
     check_puertos_ufw_anydesk
 else
-    info "UFW no activo, omitiendo verificación de puertos"
+    ufw_informar_no_activo
 fi
 
 # --- 13. Versión de Ubuntu específica ---

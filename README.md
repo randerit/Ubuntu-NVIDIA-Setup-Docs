@@ -1984,7 +1984,8 @@ En el resumen:
 
 ### Troubleshooting
 - **El script falla al iniciar:** Verifica que `doctor_lib.sh` esté en el mismo directorio.
-- **"UFW no activo, omitiendo verificación de puertos":** Los doctores leen el firewall con `LC_ALL=C` (`sudo env LC_ALL=C ufw status`) y solo la línea `Status: active` cuenta como activo, así que el idioma del sistema no importa. `Status: inactive` omite la verificación de puertos; activa UFW (Sección 3) para que se verifiquen.
+- **"UFW no activo, omitiendo verificación de puertos":** Los doctores leen el firewall con `LC_ALL=C` (`LC_ALL=C sudo ufw status`) y solo la línea `Status: active` cuenta como activo, así que el idioma del sistema no importa. `Status: inactive` omite la verificación de puertos; activa UFW (Sección 3) para que se verifiquen.
+- **"[AVISO] No se pudo leer el estado de UFW":** `ufw` está instalado pero `sudo ufw status` falló (tu usuario no tiene permiso de sudo para `ufw`, o sudo pidió contraseña), así que no se sabe si el firewall está activo y los puertos quedan sin verificar. Corre `sudo ufw status` a mano para ver el error. Es un aviso y no cambia el exit code.
 - **`--fix` no instala algo:** Revisa el log en `/tmp/doctor_fix_*.log` para ver el error exacto.
 - **Paquete Python no detectado:** El script usa `pip3 show` para verificar, que es más robusto que `import`. Si falla, verifica con `pip3 list | grep <paquete>`.
 - **NVIDIA módulo no detectado:** El script verifica vía `lsmod`, `/proc/driver/nvidia/version` y `nvidia-smi` como fallback. Si todo falla, revisa que el driver esté instalado correctamente.

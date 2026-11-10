@@ -1947,7 +1947,8 @@ In the summary:
 
 ### Troubleshooting
 - **The script fails to start:** Verify that `doctor_lib.sh` is in the same directory.
-- **"UFW not active, skipping port verification":** The doctors read the firewall with `LC_ALL=C` (`sudo env LC_ALL=C ufw status`) and only a `Status: active` line counts as active, so the system language does not matter. `Status: inactive` skips the port checks; enable UFW (Section 3) for them to run.
+- **"UFW not active, skipping port verification":** The doctors read the firewall with `LC_ALL=C` (`LC_ALL=C sudo ufw status`) and only a `Status: active` line counts as active, so the system language does not matter. `Status: inactive` skips the port checks; enable UFW (Section 3) for them to run.
+- **"[AVISO] No se pudo leer el estado de UFW" (could not read the UFW status):** `ufw` is installed but `sudo ufw status` failed (your user has no sudo permission for `ufw`, or sudo asked for a password), so it is unknown whether the firewall is active and the ports go unchecked. Run `sudo ufw status` by hand to see the error. It is a warning and does not change the exit code.
 - **`--fix` does not install something:** Review the log in `/tmp/doctor_fix_*.log` for the exact error.
 - **Python package not detected:** The script uses `pip3 show`, which is more robust than `import`. If it fails, verify with `pip3 list | grep <package>`.
 - **NVIDIA module not detected:** The script checks through `lsmod`, `/proc/driver/nvidia/version`, and `nvidia-smi` as fallback. If all fail, verify that the driver is installed correctly.

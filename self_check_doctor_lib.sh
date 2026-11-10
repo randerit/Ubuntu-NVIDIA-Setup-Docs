@@ -357,15 +357,17 @@ echo "15. UFW: puertos de lo omitido y deteccion del firewall activo"
 # doctor verificando (y con --fix abriendo) 27017/1883/18083 de un componente que
 # el equipo no tiene; (2) "grep -q active" tambien acepta "Status: inactive", y
 # con el idioma del sistema en espanol ufw dice "Estado: activo", asi que un
-# firewall activo tampoco se reconocia. ufw se consulta con LC_ALL=C via "sudo
-# env" (env_reset de sudo puede descartar la variable) y el test se ancla a la
-# linea de estado.
+# firewall activo tampoco se reconocia; (3) si sudo no podia correr ufw, la captura
+# quedaba vacia y el doctor decia "UFW no activo" en silencio. ufw se consulta con
+# "LC_ALL=C sudo ufw status": sudo conserva LC_* por su tabla env_check, y el comando
+# que sudo compara con el sudoers sigue siendo ufw (con "sudo env" seria env). El
+# test se ancla a la linea de estado.
 STUBS15="$TMP/stubs15"
 mkdir -p "$STUBS15"
-# sudo falso que descarta el idioma como hace env_reset: solo "sudo env LC_ALL=C"
-# lo recupera. ufw falso: responde en espanol salvo bajo LC_ALL=C y registra cada
-# regla que se le pide abrir.
-printf '#!/bin/sh\nexec env -u LC_ALL -u LANG -u LANGUAGE "$@"\n' >"$STUBS15/sudo"
+# sudo falso como el de un sudoers que solo permite ufw: rechaza cualquier otro
+# comando y no toca el entorno (LC_ALL=C llega a ufw). ufw falso: responde en
+# espanol salvo bajo LC_ALL=C y registra cada regla que se le pide abrir.
+printf '#!/bin/sh\n[ "$1" = ufw ] || exit 1\nexec "$@"\n' >"$STUBS15/sudo"
 cat >"$STUBS15/ufw" <<'EOF'
 #!/bin/sh
 case "$1" in
@@ -427,22 +429,59 @@ activo $'Status: active (logging on)\nx'       || { echo "   FALLA: 'Status: act
 ! activo ""                                    || { echo "   FALLA: un estado vacio se toma por activo"; fallos=$((fallos+1)); }
 ! activo $'Status: inactive\n22 ALLOW active'  || { echo "   FALLA: 'active' en otra linea se toma por activo"; fallos=$((fallos+1)); }
 
-# ufw_capturar_estado: en un sistema en espanol (sudo descarta LC_ALL) igual
-# tiene que leer "Status: active".
-t "ufw_capturar_estado lee el estado en C aunque el sistema no este en C" 0 \
-  env PATH="$STUBS15:$PATH" LC_ALL=C.UTF-8 LANG=C.UTF-8 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+# ufw_capturar_estado: en un sistema en espanol (LANG/LANGUAGE en es, LC_ALL sin
+# fijar) igual tiene que leer "Status: active". sudo falso: solo deja pasar ufw.
+ES='env -u LC_ALL LANG=es_ES.UTF-8 LANGUAGE=es'
+t "ufw_capturar_estado lee el estado en C aunque el sistema este en espanol" 0 \
+  $ES PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
 t "ufw_capturar_estado con firewall inactivo no lo da por activo" 1 \
-  env PATH="$STUBS15:$PATH" UFW_FAKE=inactive LC_ALL=C.UTF-8 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+  $ES PATH="$STUBS15:$PATH" UFW_FAKE=inactive bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+# sudo que rechaza todo (no puede correr ufw): la captura queda vacia.
+STUBS15F="$TMP/stubs15f"
+mkdir -p "$STUBS15F"
+cp "$STUBS15"/* "$STUBS15F"/
+printf '#!/bin/sh\nexit 1\n' >"$STUBS15F/sudo"
+t "ufw_capturar_estado con sudo fallido deja la captura vacia" 0 \
+  env PATH="$STUBS15F:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; [ -z "$UFW_STATUS" ]'
+
+# ufw_informar_no_activo: solo con ufw instalado y la captura vacia avisa que no
+# pudo leer; el resto es el "UFW no activo" de siempre. Sin ufw: PATH sin nada.
+informar() {  # informar <PATH> <UFW_STATUS>: salida y contadores
+  env PATH="$1" "$BASH" -c '
+    source ./doctor_lib.sh >/dev/null 2>&1
+    UFW_STATUS=$1; ufw_informar_no_activo
+    echo "WARNINGS=$warnings TOTAL=$total"' _ "$2" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+}
+mkdir -p "$TMP/vacio"
+I_SIN_UFW=$(informar "$TMP/vacio" "")
+I_VACIA=$(informar "$STUBS15:$PATH" "")
+I_INACT=$(informar "$STUBS15:$PATH" "Status: inactive")
+tiene 0 "sin ufw instalado: UFW no activo" "$I_SIN_UFW" "UFW no activo"
+tiene 1 "sin ufw instalado: no avisa de lectura" "$I_SIN_UFW" "No se pudo leer"
+tiene 0 "sin ufw instalado: no cuenta aviso" "$I_SIN_UFW" "WARNINGS=0"
+tiene 0 "ufw sin captura: avisa que no pudo leer" "$I_VACIA" "[AVISO] No se pudo leer el estado de UFW"
+tiene 1 "ufw sin captura: no dice UFW no activo" "$I_VACIA" "UFW no activo"
+tiene 0 "ufw sin captura: cuenta un aviso" "$I_VACIA" "WARNINGS=1 TOTAL=1"
+tiene 0 "ufw inactivo: UFW no activo" "$I_INACT" "UFW no activo"
+tiene 1 "ufw inactivo: no avisa de lectura" "$I_INACT" "No se pudo leer"
 
 # Los tres doctores completos, con ufw/sudo falsos en espanol.
+doctor_es() { ( unset LC_ALL; export LANG=es_ES.UTF-8 LANGUAGE=es; doctor_salida "$@" ); }
 STUBS_ANT="$STUBS"; STUBS="$STUBS15"
 for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
-  S_ACT=$(LC_ALL=C.UTF-8 doctor_salida "$d")
+  S_ACT=$(doctor_es "$d")
   tiene 0 "$d: firewall activo (sistema en espanol) verifica los puertos" "$S_ACT" "Verificando reglas de firewall"
   tiene 1 "$d: firewall activo no dice 'UFW no activo'" "$S_ACT" "UFW no activo"
-  S_INA=$(UFW_FAKE=inactive LC_ALL=C.UTF-8 doctor_salida "$d")
+  tiene 1 "$d: firewall activo no avisa que no pudo leer" "$S_ACT" "No se pudo leer el estado de UFW"
+  S_INA=$(UFW_FAKE=inactive doctor_es "$d")
   tiene 0 "$d: firewall inactivo omite los puertos" "$S_INA" "UFW no activo"
   tiene 1 "$d: firewall inactivo no verifica puertos" "$S_INA" "Verificando reglas de firewall"
+  STUBS="$STUBS15F"
+  S_SUDO=$(doctor_salida "$d")
+  STUBS="$STUBS15"
+  tiene 0 "$d: sudo sin poder correr ufw avisa que no pudo leer" "$S_SUDO" "[AVISO] No se pudo leer el estado de UFW"
+  tiene 1 "$d: sudo sin poder correr ufw no dice 'UFW no activo'" "$S_SUDO" "UFW no activo"
+  tiene 1 "$d: sudo sin poder correr ufw no verifica puertos" "$S_SUDO" "Verificando reglas de firewall"
 done
 A_SKIP=$(doctor_salida doctor_analitica.sh --skip-mongodb)
 tiene 1 "analitica con --skip-mongodb no verifica el puerto 27017" "$A_SKIP" "(27017)"
