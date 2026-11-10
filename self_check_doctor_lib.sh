@@ -355,28 +355,35 @@ done
 echo "15. UFW: puertos de lo omitido y deteccion del firewall activo"
 # Dos defectos del bloque de puertos: (1) --skip-mongodb / --skip-emqx dejaban el
 # doctor verificando (y con --fix abriendo) 27017/1883/18083 de un componente que
-# el equipo no tiene; (2) "grep -q active" tambien acepta "Status: inactive", y
-# con el idioma del sistema en espanol ufw dice "Estado: activo", asi que un
-# firewall activo tampoco se reconocia; (3) si sudo no podia correr ufw, la captura
-# quedaba vacia y el doctor decia "UFW no activo" en silencio. ufw se consulta con
-# "LC_ALL=C sudo ufw status": sudo conserva LC_* por su tabla env_check, y el comando
-# que sudo compara con el sudoers sigue siendo ufw (con "sudo env" seria env). El
-# test se ancla a la linea de estado.
+# el equipo no tiene; (2) "grep -q active" tambien acepta "Status: inactive", asi
+# que un firewall inactivo se tomaba por activo; (3) si sudo no podia correr ufw, la
+# captura quedaba vacia y el doctor decia "UFW no activo" en silencio.
+# Sobre el idioma: ufw 0.36 (Ubuntu 22.04/24.04) no carga sus traducciones, asi que
+# hoy imprime "Status: active" en ingles. Igual se consulta con
+# "LANGUAGE=C LC_ALL=C sudo ufw status" por si una version de ufw que si traduce
+# ("Estado: activo") rompiera la deteccion: Python gettext lee LANGUAGE antes que
+# LC_ALL, por eso van las dos. sudo conserva LANGUAGE y LC_* por su tabla env_check,
+# y el comando que sudo compara con el sudoers sigue siendo ufw (con "sudo env"
+# seria env). El test se ancla a la linea de estado.
 STUBS15="$TMP/stubs15"
 mkdir -p "$STUBS15"
 # sudo falso como el de un sudoers que solo permite ufw: rechaza cualquier otro
-# comando y no toca el entorno (LC_ALL=C llega a ufw). ufw falso: responde en
-# espanol salvo bajo LC_ALL=C y registra cada regla que se le pide abrir.
+# comando y no toca el entorno (LANGUAGE=C y LC_ALL=C llegan a ufw). ufw falso: simula
+# un ufw que SI traduce: responde en espanol salvo que el idioma efectivo de los
+# mensajes sea C. El efectivo sigue la precedencia de Python gettext: LANGUAGE si no
+# esta vacio, si no LC_ALL, si no LC_MESSAGES, si no LANG. Registra cada regla que se
+# le pide abrir.
 printf '#!/bin/sh\n[ "$1" = ufw ] || exit 1\nexec "$@"\n' >"$STUBS15/sudo"
 cat >"$STUBS15/ufw" <<'EOF'
 #!/bin/sh
+efectivo=${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-$LANG}}}
 case "$1" in
   status)
     if [ "$UFW_FAKE" = inactive ]; then
-      [ "$LC_ALL" = C ] && echo "Status: inactive" || echo "Estado: inactivo"
+      [ "$efectivo" = C ] && echo "Status: inactive" || echo "Estado: inactivo"
       exit 0
     fi
-    [ "$LC_ALL" = C ] && echo "Status: active" || echo "Estado: activo"
+    [ "$efectivo" = C ] && echo "Status: active" || echo "Estado: activo"
     for p in 22 27017 1883 18083 554 1880 80 443 6568 50001:50003; do echo "$p ALLOW Anywhere"; done
     ;;
   *) echo "$*" >>"$UFW_LOG" ;;
@@ -429,11 +436,17 @@ activo $'Status: active (logging on)\nx'       || { echo "   FALLA: 'Status: act
 ! activo ""                                    || { echo "   FALLA: un estado vacio se toma por activo"; fallos=$((fallos+1)); }
 ! activo $'Status: inactive\n22 ALLOW active'  || { echo "   FALLA: 'active' en otra linea se toma por activo"; fallos=$((fallos+1)); }
 
-# ufw_capturar_estado: en un sistema en espanol (LANG/LANGUAGE en es, LC_ALL sin
-# fijar) igual tiene que leer "Status: active". sudo falso: solo deja pasar ufw.
+# ufw_capturar_estado: aunque el ufw traduzca (el falso responde "Estado: activo"),
+# con LANGUAGE/LC_ALL/LANG en espanol igual tiene que leer "Status: active". LANGUAGE
+# manda sobre LC_ALL, asi que se prueban las tres formas. sudo falso: solo deja pasar
+# ufw.
 ES='env -u LC_ALL LANG=es_ES.UTF-8 LANGUAGE=es'
-t "ufw_capturar_estado lee el estado en C aunque el sistema este en espanol" 0 \
+t "ufw_capturar_estado lee el estado en C con LANGUAGE=es (LC_ALL sin fijar)" 0 \
   $ES PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado lee el estado en C con LANGUAGE=es y LC_ALL=es_CL.UTF-8" 0 \
+  env LANGUAGE=es LC_ALL=es_CL.UTF-8 PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado lee el estado en C con solo LC_ALL=es_CL.UTF-8" 0 \
+  env -u LANGUAGE LC_ALL=es_CL.UTF-8 PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
 t "ufw_capturar_estado con firewall inactivo no lo da por activo" 1 \
   $ES PATH="$STUBS15:$PATH" UFW_FAKE=inactive bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
 # sudo que rechaza todo (no puede correr ufw): la captura queda vacia.
@@ -465,12 +478,13 @@ tiene 0 "ufw sin captura: cuenta un aviso" "$I_VACIA" "WARNINGS=1 TOTAL=1"
 tiene 0 "ufw inactivo: UFW no activo" "$I_INACT" "UFW no activo"
 tiene 1 "ufw inactivo: no avisa de lectura" "$I_INACT" "No se pudo leer"
 
-# Los tres doctores completos, con ufw/sudo falsos en espanol.
+# Los tres doctores completos, con sudo falso y un ufw falso que traduce, en un
+# sistema en espanol (LANGUAGE=es).
 doctor_es() { ( unset LC_ALL; export LANG=es_ES.UTF-8 LANGUAGE=es; doctor_salida "$@" ); }
 STUBS_ANT="$STUBS"; STUBS="$STUBS15"
 for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   S_ACT=$(doctor_es "$d")
-  tiene 0 "$d: firewall activo (sistema en espanol) verifica los puertos" "$S_ACT" "Verificando reglas de firewall"
+  tiene 0 "$d: firewall activo (ufw traducido, sistema en espanol) verifica los puertos" "$S_ACT" "Verificando reglas de firewall"
   tiene 1 "$d: firewall activo no dice 'UFW no activo'" "$S_ACT" "UFW no activo"
   tiene 1 "$d: firewall activo no avisa que no pudo leer" "$S_ACT" "No se pudo leer el estado de UFW"
   S_INA=$(UFW_FAKE=inactive doctor_es "$d")

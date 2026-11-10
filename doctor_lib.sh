@@ -966,16 +966,19 @@ check_bloque_anydesk() {
 # doctor): pasarle la salida de ufw a un "grep -q" por pipe es un falso negativo
 # con muchas reglas, porque grep -q corta el pipe, ufw muere con SIGPIPE y
 # pipefail propaga el 141. De paso, evita diez sudo seguidos.
-# Se consulta con LC_ALL=C: ufw traduce su salida ("Estado: activo" en espanol) y
-# los chequeos de abajo leen "Status: active". Es "LC_ALL=C sudo ufw" y no
-# "sudo env LC_ALL=C ufw": con "env" sudo compara el comando "env" contra el
-# sudoers, y un equipo que solo permite ufw lo rechazaria. sudo conserva LC_*
-# bajo env_reset por su tabla env_check (mientras el valor no lleve "/" ni "%"),
-# asi que ufw igual lo recibe. Si sudo falla (sin permiso, pide clave) la captura
-# queda vacia: ufw_informar_no_activo lo distingue de un firewall inactivo.
+# ufw 0.36 (Ubuntu 22.04/24.04) no carga sus traducciones, asi que hoy imprime
+# "Status: active" en ingles. Se consulta igual con LANGUAGE=C LC_ALL=C, por si una
+# version de ufw que si traduce ("Estado: activo") rompiera los chequeos de abajo,
+# que leen "Status: active". Python gettext lee LANGUAGE antes que LC_ALL, por eso
+# van las dos. Es "LANGUAGE=C LC_ALL=C sudo ufw" y no "sudo env LC_ALL=C ufw": con
+# "env" sudo compara el comando "env" contra el sudoers, y un equipo que solo
+# permite ufw lo rechazaria. sudo conserva LANGUAGE y LC_* bajo env_reset por su
+# tabla env_check (mientras el valor no lleve "/" ni "%"), asi que ufw igual los
+# recibe. Si sudo falla (sin permiso, pide clave) la captura queda vacia:
+# ufw_informar_no_activo lo distingue de un firewall inactivo.
 ufw_capturar_estado() {
     # shellcheck disable=SC2034  # lo leen check_puertos_ufw_* via eval
-    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && LC_ALL=C sudo ufw status 2>/dev/null || true)
+    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && LANGUAGE=C LC_ALL=C sudo ufw status 2>/dev/null || true)
 }
 
 # Firewall activo? Cuenta solo la linea de estado: "Status: inactive" o
