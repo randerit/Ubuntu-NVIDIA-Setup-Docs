@@ -1979,11 +1979,13 @@ En el resumen:
 - Estación que abre las interfaces web y mira el software; lleva herramientas de desarrollo por si hacen falta en el sitio
 - MongoDB y MongoDB Compass (sin autorización), EMQX, MQTTX, Docker, ffmpeg, AnyDesk con su override X11, Golang y Visual Studio Code
 - Sin GStreamer (runtime), RustDesk, Angry IP, stack ML ni Node-RED
-- Acepta `--skip-mongodb`, `--skip-emqx` y `--skip-snaps`: lo omitido se informa como `[INFO]`, no como `[FALLO]`
+- Acepta `--skip-mongodb`, `--skip-emqx` y `--skip-snaps`: lo omitido se informa como `[INFO]`, no como `[FALLO]`; tampoco se verifican (ni se abren con `--fix`) los puertos de lo omitido: 27017 con `--skip-mongodb`, 1883 y 18083 con `--skip-emqx`
 - Puertos: 22 (SSH), 27017 (MongoDB), 1883 y 18083 (EMQX), AnyDesk (80, 443, 6568, 50001-50003/udp); sin RTSP 554 ni Node-RED 1880
 
 ### Troubleshooting
 - **El script falla al iniciar:** Verifica que `doctor_lib.sh` esté en el mismo directorio.
+- **"UFW no activo, omitiendo verificación de puertos":** ufw 0.36 (Ubuntu 22.04/24.04) no carga sus traducciones, así que su salida hoy es en inglés. Los doctores igual la leen con `LANGUAGE=C LC_ALL=C` (`LANGUAGE=C LC_ALL=C sudo ufw status`), para que una versión de ufw que sí traduzca (`Estado: activo`) no rompa la detección, y solo la línea `Status: active` cuenta como activo. `Status: inactive` omite la verificación de puertos; activa UFW (Sección 3) para que se verifiquen.
+- **"[AVISO] No se pudo leer el estado de UFW":** `ufw` está instalado pero `sudo ufw status` falló (tu usuario no tiene permiso de sudo para `ufw`, o sudo pidió contraseña), así que no se sabe si el firewall está activo y los puertos quedan sin verificar. Corre `sudo ufw status` a mano para ver el error. Es un aviso y no cambia el exit code.
 - **`--fix` no instala algo:** Revisa el log en `/tmp/doctor_fix_*.log` para ver el error exacto.
 - **Paquete Python no detectado:** El script usa `pip3 show` para verificar, que es más robusto que `import`. Si falla, verifica con `pip3 list | grep <paquete>`.
 - **NVIDIA módulo no detectado:** El script verifica vía `lsmod`, `/proc/driver/nvidia/version` y `nvidia-smi` como fallback. Si todo falla, revisa que el driver esté instalado correctamente.

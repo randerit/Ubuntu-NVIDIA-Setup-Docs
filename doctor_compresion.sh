@@ -334,7 +334,7 @@ check_and_fix "Conexión a internet" "ping -c 1 -W 3 8.8.8.8"
 check_and_fix "Resolución DNS" "host google.com"
 
 ufw_capturar_estado
-if grep -q "active" <<<"$UFW_STATUS"; then
+if ufw_esta_activo; then
     info "Verificando reglas de firewall..."
     check_puertos_ufw_base
     check_and_fix_minor "Puerto GStreamer RTSP (554) configurado" \
@@ -342,7 +342,7 @@ if grep -q "active" <<<"$UFW_STATUS"; then
         "sudo ufw allow 554/tcp && sudo ufw allow 554/udp"
     check_puertos_ufw_anydesk
 else
-    info "UFW no activo, omitiendo verificación de puertos"
+    ufw_informar_no_activo
 fi
 
 # --- 14. Versión de Ubuntu específica ---

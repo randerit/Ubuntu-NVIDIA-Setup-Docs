@@ -908,6 +908,7 @@ check_bloque_mongodb() {
             "sudo systemctl enable mongod"
 
         if systemctl is-active mongod > /dev/null 2>&1; then
+            local mongo_version
             mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
             info "MongoDB: ${mongo_version}"
         fi
@@ -965,25 +966,62 @@ check_bloque_anydesk() {
 # doctor): pasarle la salida de ufw a un "grep -q" por pipe es un falso negativo
 # con muchas reglas, porque grep -q corta el pipe, ufw muere con SIGPIPE y
 # pipefail propaga el 141. De paso, evita diez sudo seguidos.
+# ufw 0.36 (Ubuntu 22.04/24.04) no carga sus traducciones, asi que hoy imprime
+# "Status: active" en ingles. Se consulta igual con LANGUAGE=C LC_ALL=C, por si una
+# version de ufw que si traduce ("Estado: activo") rompiera los chequeos de abajo,
+# que leen "Status: active". Python gettext lee LANGUAGE antes que LC_ALL, por eso
+# van las dos. Es "LANGUAGE=C LC_ALL=C sudo ufw" y no "sudo env LC_ALL=C ufw": con
+# "env" sudo compara el comando "env" contra el sudoers, y un equipo que solo
+# permite ufw lo rechazaria. sudo conserva LANGUAGE y LC_* bajo env_reset por su
+# tabla env_check (mientras el valor no lleve "/" ni "%"), asi que ufw igual los
+# recibe. Si sudo falla (sin permiso, pide clave) la captura queda vacia:
+# ufw_informar_no_activo lo distingue de un firewall inactivo.
 ufw_capturar_estado() {
     # shellcheck disable=SC2034  # lo leen check_puertos_ufw_* via eval
-    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
+    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && LANGUAGE=C LC_ALL=C sudo ufw status 2>/dev/null || true)
 }
 
-# SSH, MongoDB y EMQX (MQTT y Dashboard).
+# Firewall activo? Cuenta solo la linea de estado: "Status: inactive" o
+# una captura vacia no son activo, y un "active" suelto en otra linea tampoco.
+ufw_esta_activo() {
+    grep -q '^Status: active' <<<"$UFW_STATUS"
+}
+
+# Rama "no activo" de los tres doctores. Con ufw instalado y la captura vacia no se
+# sabe si el firewall esta activo (sudo fallo): un [AVISO] y no un "UFW no activo"
+# silencioso que saltee los puertos como si no hubiera nada que verificar. [AVISO]
+# y no [FALLO]: no se pudo comprobar, no es que falte algo; no cambia el exit code.
+ufw_informar_no_activo() {
+    if [ -z "$UFW_STATUS" ] && command -v ufw > /dev/null 2>&1; then
+        total=$((total + 1))
+        warnings=$((warnings + 1))
+        echo -e "  ${WARN} No se pudo leer el estado de UFW (sudo ufw status falló); puertos sin verificar"
+    else
+        info "UFW no activo, omitiendo verificación de puertos"
+    fi
+}
+
+# SSH siempre; MongoDB y EMQX (MQTT y Dashboard) solo si el equipo los tiene: con
+# --skip-mongodb / --skip-emqx el puerto no se verifica ni, con --fix, se abre.
+# No se imprime nada por lo omitido: check_bloque_mongodb / check_bloque_emqx ya
+# avisaron que ese componente no aplica.
 check_puertos_ufw_base() {
     check_and_fix_minor "Puerto SSH (22) configurado" \
         "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
         "sudo ufw allow ssh"
-    check_and_fix_minor "Puerto MongoDB (27017) configurado" \
-        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 27017/tcp"
-    check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
-        "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 1883/tcp"
-    check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
-        "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
-        "sudo ufw allow 18083/tcp"
+    if ! $SKIP_MONGODB; then
+        check_and_fix_minor "Puerto MongoDB (27017) configurado" \
+            "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 27017/tcp"
+    fi
+    if ! $SKIP_EMQX; then
+        check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
+            "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 1883/tcp"
+        check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
+            "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+            "sudo ufw allow 18083/tcp"
+    fi
 }
 
 # AnyDesk: HTTP, HTTPS, el puerto propio y el rango UDP.

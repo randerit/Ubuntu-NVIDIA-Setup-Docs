@@ -352,6 +352,161 @@ for c in "(554)" "(50001-50003)" "AnyDesk con override X11" "EMQX instalado" "Mo
   tiene 0 "compresion conserva sus checks compartidos" "$COMP_FULL" "$c"
 done
 
+echo "15. UFW: puertos de lo omitido y deteccion del firewall activo"
+# Dos defectos del bloque de puertos: (1) --skip-mongodb / --skip-emqx dejaban el
+# doctor verificando (y con --fix abriendo) 27017/1883/18083 de un componente que
+# el equipo no tiene; (2) "grep -q active" tambien acepta "Status: inactive", asi
+# que un firewall inactivo se tomaba por activo; (3) si sudo no podia correr ufw, la
+# captura quedaba vacia y el doctor decia "UFW no activo" en silencio.
+# Sobre el idioma: ufw 0.36 (Ubuntu 22.04/24.04) no carga sus traducciones, asi que
+# hoy imprime "Status: active" en ingles. Igual se consulta con
+# "LANGUAGE=C LC_ALL=C sudo ufw status" por si una version de ufw que si traduce
+# ("Estado: activo") rompiera la deteccion: Python gettext lee LANGUAGE antes que
+# LC_ALL, por eso van las dos. sudo conserva LANGUAGE y LC_* por su tabla env_check,
+# y el comando que sudo compara con el sudoers sigue siendo ufw (con "sudo env"
+# seria env). El test se ancla a la linea de estado.
+STUBS15="$TMP/stubs15"
+mkdir -p "$STUBS15"
+# sudo falso como el de un sudoers que solo permite ufw: rechaza cualquier otro
+# comando y no toca el entorno (LANGUAGE=C y LC_ALL=C llegan a ufw). ufw falso: simula
+# un ufw que SI traduce: responde en espanol salvo que el idioma efectivo de los
+# mensajes sea C. El efectivo sigue la precedencia de Python gettext: LANGUAGE si no
+# esta vacio, si no LC_ALL, si no LC_MESSAGES, si no LANG. Registra cada regla que se
+# le pide abrir.
+printf '#!/bin/sh\n[ "$1" = ufw ] || exit 1\nexec "$@"\n' >"$STUBS15/sudo"
+cat >"$STUBS15/ufw" <<'EOF'
+#!/bin/sh
+efectivo=${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-$LANG}}}
+case "$1" in
+  status)
+    if [ "$UFW_FAKE" = inactive ]; then
+      [ "$efectivo" = C ] && echo "Status: inactive" || echo "Estado: inactivo"
+      exit 0
+    fi
+    [ "$efectivo" = C ] && echo "Status: active" || echo "Estado: activo"
+    for p in 22 27017 1883 18083 554 1880 80 443 6568 50001:50003; do echo "$p ALLOW Anywhere"; done
+    ;;
+  *) echo "$*" >>"$UFW_LOG" ;;
+esac
+EOF
+cp "$STUBS/ping" "$STUBS15/ping"; cp "$STUBS/ping" "$STUBS15/host"
+chmod +x "$STUBS15"/*
+
+# puertos_base <skip_mongodb> <skip_emqx>: check_puertos_ufw_base con --fix y un
+# UFW_STATUS vacio (falta todo). Imprime la salida y, despues, las reglas que se
+# intentaron abrir.
+puertos_base() {
+  local log="$TMP/ufw15.log"; : >"$log"
+  PATH="$STUBS15:$PATH" UFW_LOG="$log" bash -c '
+    source ./doctor_lib.sh >/dev/null 2>&1
+    SKIP_MONGODB=$1; SKIP_EMQX=$2; FIX_MODE=true; LOG_FILE=/dev/null
+    UFW_STATUS=""
+    check_puertos_ufw_base' _ "$1" "$2" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+  echo "ABIERTOS: $(tr '\n' ' ' <"$log")"
+}
+B_NADA=$(puertos_base false false)
+B_MONGO=$(puertos_base true false)
+B_EMQX=$(puertos_base false true)
+B_AMBOS=$(puertos_base true true)
+tiene 0 "sin skips se verifica y abre 27017" "$B_NADA" "allow 27017/tcp"
+tiene 0 "sin skips se verifica y abre 1883" "$B_NADA" "allow 1883/tcp"
+tiene 0 "sin skips se verifica y abre 18083" "$B_NADA" "allow 18083/tcp"
+tiene 1 "--skip-mongodb no verifica 27017" "$B_MONGO" "(27017)"
+tiene 1 "--skip-mongodb no abre 27017" "$B_MONGO" "27017"
+tiene 0 "--skip-mongodb sigue con EMQX 1883" "$B_MONGO" "allow 1883/tcp"
+tiene 0 "--skip-mongodb sigue con EMQX 18083" "$B_MONGO" "allow 18083/tcp"
+tiene 1 "--skip-emqx no verifica 1883" "$B_EMQX" "(1883)"
+tiene 1 "--skip-emqx no verifica 18083" "$B_EMQX" "(18083)"
+tiene 1 "--skip-emqx no abre 1883" "$B_EMQX" "allow 1883/tcp"
+tiene 1 "--skip-emqx no abre 18083" "$B_EMQX" "allow 18083/tcp"
+tiene 0 "--skip-emqx sigue con MongoDB 27017" "$B_EMQX" "allow 27017/tcp"
+tiene 0 "ambos skips: SSH 22 se sigue verificando" "$B_AMBOS" "(22)"
+tiene 0 "ambos skips: SSH 22 se sigue abriendo" "$B_AMBOS" "allow ssh"
+tiene 1 "ambos skips: ningun puerto de MongoDB/EMQX" "$B_AMBOS" "(27017)"
+tiene 1 "ambos skips: ni 1883" "$B_AMBOS" "1883"
+tiene 1 "ambos skips: ni 18083" "$B_AMBOS" "18083"
+
+# ufw_esta_activo: solo la linea de estado "Status: active" vale.
+activo() {  # activo <estado>
+  bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; UFW_STATUS=$1; ufw_esta_activo' _ "$1" >/dev/null 2>&1
+}
+activo $'Status: active\n22 ALLOW Anywhere'    || { echo "   FALLA: 'Status: active' no se reconoce como activo"; fallos=$((fallos+1)); }
+activo $'Status: active (logging on)\nx'       || { echo "   FALLA: 'Status: active' con sufijo no se reconoce como activo"; fallos=$((fallos+1)); }
+! activo "Status: inactive"                    || { echo "   FALLA: 'Status: inactive' se toma por activo"; fallos=$((fallos+1)); }
+! activo ""                                    || { echo "   FALLA: un estado vacio se toma por activo"; fallos=$((fallos+1)); }
+! activo $'Status: inactive\n22 ALLOW active'  || { echo "   FALLA: 'active' en otra linea se toma por activo"; fallos=$((fallos+1)); }
+
+# ufw_capturar_estado: aunque el ufw traduzca (el falso responde "Estado: activo"),
+# con LANGUAGE/LC_ALL/LANG en espanol igual tiene que leer "Status: active". LANGUAGE
+# manda sobre LC_ALL, asi que se prueban las tres formas. sudo falso: solo deja pasar
+# ufw.
+ES='env -u LC_ALL LANG=es_ES.UTF-8 LANGUAGE=es'
+t "ufw_capturar_estado lee el estado en C con LANGUAGE=es (LC_ALL sin fijar)" 0 \
+  $ES PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado lee el estado en C con LANGUAGE=es y LC_ALL=es_CL.UTF-8" 0 \
+  env LANGUAGE=es LC_ALL=es_CL.UTF-8 PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado lee el estado en C con solo LC_ALL=es_CL.UTF-8" 0 \
+  env -u LANGUAGE LC_ALL=es_CL.UTF-8 PATH="$STUBS15:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+t "ufw_capturar_estado con firewall inactivo no lo da por activo" 1 \
+  $ES PATH="$STUBS15:$PATH" UFW_FAKE=inactive bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; ufw_esta_activo'
+# sudo que rechaza todo (no puede correr ufw): la captura queda vacia.
+STUBS15F="$TMP/stubs15f"
+mkdir -p "$STUBS15F"
+cp "$STUBS15"/* "$STUBS15F"/
+printf '#!/bin/sh\nexit 1\n' >"$STUBS15F/sudo"
+t "ufw_capturar_estado con sudo fallido deja la captura vacia" 0 \
+  env PATH="$STUBS15F:$PATH" bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; ufw_capturar_estado; [ -z "$UFW_STATUS" ]'
+
+# ufw_informar_no_activo: solo con ufw instalado y la captura vacia avisa que no
+# pudo leer; el resto es el "UFW no activo" de siempre. Sin ufw: PATH sin nada.
+informar() {  # informar <PATH> <UFW_STATUS>: salida y contadores
+  env PATH="$1" "$BASH" -c '
+    source ./doctor_lib.sh >/dev/null 2>&1
+    UFW_STATUS=$1; ufw_informar_no_activo
+    echo "WARNINGS=$warnings TOTAL=$total"' _ "$2" 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+}
+mkdir -p "$TMP/vacio"
+I_SIN_UFW=$(informar "$TMP/vacio" "")
+I_VACIA=$(informar "$STUBS15:$PATH" "")
+I_INACT=$(informar "$STUBS15:$PATH" "Status: inactive")
+tiene 0 "sin ufw instalado: UFW no activo" "$I_SIN_UFW" "UFW no activo"
+tiene 1 "sin ufw instalado: no avisa de lectura" "$I_SIN_UFW" "No se pudo leer"
+tiene 0 "sin ufw instalado: no cuenta aviso" "$I_SIN_UFW" "WARNINGS=0"
+tiene 0 "ufw sin captura: avisa que no pudo leer" "$I_VACIA" "[AVISO] No se pudo leer el estado de UFW"
+tiene 1 "ufw sin captura: no dice UFW no activo" "$I_VACIA" "UFW no activo"
+tiene 0 "ufw sin captura: cuenta un aviso" "$I_VACIA" "WARNINGS=1 TOTAL=1"
+tiene 0 "ufw inactivo: UFW no activo" "$I_INACT" "UFW no activo"
+tiene 1 "ufw inactivo: no avisa de lectura" "$I_INACT" "No se pudo leer"
+
+# Los tres doctores completos, con sudo falso y un ufw falso que traduce, en un
+# sistema en espanol (LANGUAGE=es).
+doctor_es() { ( unset LC_ALL; export LANG=es_ES.UTF-8 LANGUAGE=es; doctor_salida "$@" ); }
+STUBS_ANT="$STUBS"; STUBS="$STUBS15"
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
+  S_ACT=$(doctor_es "$d")
+  tiene 0 "$d: firewall activo (ufw traducido, sistema en espanol) verifica los puertos" "$S_ACT" "Verificando reglas de firewall"
+  tiene 1 "$d: firewall activo no dice 'UFW no activo'" "$S_ACT" "UFW no activo"
+  tiene 1 "$d: firewall activo no avisa que no pudo leer" "$S_ACT" "No se pudo leer el estado de UFW"
+  S_INA=$(UFW_FAKE=inactive doctor_es "$d")
+  tiene 0 "$d: firewall inactivo omite los puertos" "$S_INA" "UFW no activo"
+  tiene 1 "$d: firewall inactivo no verifica puertos" "$S_INA" "Verificando reglas de firewall"
+  STUBS="$STUBS15F"
+  S_SUDO=$(doctor_salida "$d")
+  STUBS="$STUBS15"
+  tiene 0 "$d: sudo sin poder correr ufw avisa que no pudo leer" "$S_SUDO" "[AVISO] No se pudo leer el estado de UFW"
+  tiene 1 "$d: sudo sin poder correr ufw no dice 'UFW no activo'" "$S_SUDO" "UFW no activo"
+  tiene 1 "$d: sudo sin poder correr ufw no verifica puertos" "$S_SUDO" "Verificando reglas de firewall"
+done
+A_SKIP=$(doctor_salida doctor_analitica.sh --skip-mongodb)
+tiene 1 "analitica con --skip-mongodb no verifica el puerto 27017" "$A_SKIP" "(27017)"
+tiene 0 "analitica con --skip-mongodb sigue verificando 1880" "$A_SKIP" "(1880)"
+C_SKIP=$(doctor_salida doctor_compresion.sh --skip-mongodb --skip-emqx)
+for p in "(27017)" "(1883)" "(18083)"; do
+  tiene 1 "compresion con --skip-mongodb --skip-emqx no verifica" "$C_SKIP" "$p"
+done
+tiene 0 "compresion con skips sigue verificando RTSP 554" "$C_SKIP" "(554)"
+STUBS="$STUBS_ANT"
+
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"
 else
