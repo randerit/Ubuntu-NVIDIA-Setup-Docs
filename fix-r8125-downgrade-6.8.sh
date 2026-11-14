@@ -2,7 +2,7 @@
 #===============================================================================
 # fix-r8125-downgrade-6.8.sh
 #
-# Flota Workstation - Ubuntu 24.04 LTS
+# Flota de equipos - Ubuntu 24.04 LTS
 #
 # FASE 0: Comprueba conectividad. Si hay acceso a repos de Ubuntu y/o GitHub,
 #   los paquetes se resuelven online (apt / wget). Si no, modo offline
@@ -31,7 +31,7 @@ set -euo pipefail
 
 #--------------------------- Configuracion ------------------------------------
 TARGET_KVER="6.8.0-137-generic"          # kernel GA objetivo
-DEB_DIR="/opt/workstation-debs/debs"             # donde se copian los .deb por scp
+DEB_DIR="/opt/workstation-debs"             # donde se copian los .deb por scp
 R8125_DEB_VER="9.016.01-1"               # version a descargar de GitHub si hay red (min 9.014.01)
 PIN_FILE="/etc/apt/preferences.d/99-workstation-pin-ga-kernel"
 LOG_FILE="/var/log/nic-kernel-downgrade.log"
@@ -653,7 +653,7 @@ log "OK: imagen, modulos y headers $TARGET_KVER presentes."
 
 # 2b. Pin de apt: bloquear el track HWE (7.0.x) permitiendo solo 6.8.x
 #
-# Si el equipo se aprovisiono con los .deb de Workstation, el instalador ya dejo su
+# Si el equipo se aprovisiono con los .deb del proyecto, el instalador ya dejo su
 # propio pin en 99-no-hwe-kernel. Escribir un segundo archivo que bloquea lo
 # mismo no aporta nada y deja al operador con dos fuentes de verdad que hay que
 # recordar borrar juntas el dia que se abra el carril HWE. Se detecta y se
@@ -670,7 +670,7 @@ else
 fi
 if [[ ! -f "$INSTALLER_PIN" ]]; then
     if write_if_changed "$PIN_FILE" <<'EOF'
-# Workstation - Pin de flota al kernel GA (6.8.x)
+# Pin de flota al kernel GA (6.8.x)
 # Motivo: incompatibilidad TCMalloc/rseq de MongoDB 8.0 con track HWE 7.0.x
 # y perdida de driver RTL8125D en downgrades. NO ELIMINAR sin aprobacion.
 Package: linux-generic-hwe-24.04 linux-image-generic-hwe-24.04 linux-headers-generic-hwe-24.04
@@ -731,7 +731,7 @@ if [[ $REQUIRED_R8125 -eq 1 ]]; then
     log ""
     log "--- FASE 3: Instalando watchdog de auto-sanacion (r8125 zombie) ---"
 
-    WATCHDOG_BIN="/opt/workstation-debs/bin/r8125-zombie-watchdog.sh"
+    WATCHDOG_BIN="/opt/nic-tools/bin/r8125-zombie-watchdog.sh"
     WATCHDOG_SERVICE="/etc/systemd/system/nic-r8125-watchdog.service"
     WATCHDOG_TIMER="/etc/systemd/system/nic-r8125-watchdog.timer"
 
@@ -891,18 +891,18 @@ WDEOF
 
         if write_if_changed "$WATCHDOG_SERVICE" <<'EOF'
 [Unit]
-Description=Workstation - Chequeo y auto-sanacion de zombie RTL8125 (r8125)
+Description=Chequeo y auto-sanacion de zombie RTL8125 (r8125)
 After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/workstation-debs/bin/r8125-zombie-watchdog.sh
+ExecStart=/opt/nic-tools/bin/r8125-zombie-watchdog.sh
 EOF
         then WD_CHANGED=1; fi
 
         if write_if_changed "$WATCHDOG_TIMER" <<'EOF'
 [Unit]
-Description=Workstation - Timer periodico del watchdog r8125
+Description=Timer periodico del watchdog r8125
 
 [Timer]
 OnBootSec=5min

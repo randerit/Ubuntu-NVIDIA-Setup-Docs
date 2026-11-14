@@ -1748,7 +1748,7 @@ y comparten `nic_lib.sh`. **Copiá el repo completo al equipo**, no los archivos
 
 #### Dos caminos, un solo fuente
 
-Estos scripts —y los tres doctor— viajan **también dentro de los `.deb` de Workstation**, copiados byte
+Estos scripts —y los tres doctor— viajan **también dentro de los `.deb` del proyecto**, copiados byte
 a byte desde este repo al construirlos. No hay dos versiones que mantener: el build de
 `Ubuntu-NVIDIA-Deb-Packages` los toma de acá, y su suite verifica el sha256 de cada uno contra el
 original.
@@ -1795,6 +1795,8 @@ instalador, porque la instalación hizo lo que podía hacer.
 sudo ./diag-nic.sh <interfaz> [segundos_de_captura] [gateway_de_prueba]
 sudo ./diag-nic.sh enp13s0 30 192.0.2.1
 ```
+
+`192.0.2.1` es una IP de documentación (RFC 5737): reemplázala por el gateway o un servidor alcanzable de tu red.
 
 Deja tres artefactos en el directorio actual: el log completo, un `.pcap` de la captura sin filtro y
 una línea en `diag-results.csv` para consolidar varios equipos.
@@ -2482,8 +2484,8 @@ alternativas de hardware suelen ganar en tiempo:
 Si no hay red en absoluto para descargar el DKMS, usá tethering USB desde un teléfono o llevá el
 `.deb` y sus dependencias en un pendrive.
 
-> Si estás aprovisionando con los `.deb` de Workstation, todo este paso lo hace `nic-driver-rescue`,
-> que viaja dentro de `nvidia-cuda-setup`, `-compression` y `-analytics`. Detecta la NIC, saca
+> Si estás aprovisionando con los `.deb` del proyecto, todo este paso lo hace `nic-driver-rescue`,
+> que viaja dentro de `nvidia-cuda-setup`, `workstation-compression` y `workstation-analytics`. Detecta la NIC, saca
 > el `r8125-dkms` viejo, baja el del fabricante, compila para el GA, quita el blacklist y verifica.
 > Con `--deb RUTA` o `--no-download` funciona sin internet.
 

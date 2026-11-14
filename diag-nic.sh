@@ -27,7 +27,7 @@
 # Ejemplos:
 #   sudo ./diag-nic.sh enp13s0
 #   sudo ./diag-nic.sh enp13s0 30
-#   sudo ./diag-nic.sh enp13s0 30 192.0.2.1
+#   sudo ./diag-nic.sh enp13s0 30 192.0.2.1   # 192.0.2.1 = IP de documentacion; usa tu gateway
 #
 # Codigos de salida (utiles para consolidar flota):
 #   0 = sin hallazgos por encima de informativo

@@ -1707,7 +1707,7 @@ share `nic_lib.sh`. **Copy the whole repo to the machine**, not the individual f
 
 #### Two channels, one source
 
-These scripts — and the three doctors — also travel **inside the Workstation `.deb` packages**, copied
+These scripts — and the three doctors — also travel **inside the project's `.deb` packages**, copied
 byte for byte from this repo at build time. There are not two versions to maintain: the
 `Ubuntu-NVIDIA-Deb-Packages` build pulls them from here, and its suite verifies each file's sha256
 against the original.
@@ -1755,6 +1755,8 @@ the installer's exit code, because the install did what it could do.
 sudo ./diag-nic.sh <interface> [capture_seconds] [test_gateway]
 sudo ./diag-nic.sh enp13s0 30 192.0.2.1
 ```
+
+`192.0.2.1` is a documentation IP (RFC 5737): replace it with your network's gateway or a reachable server.
 
 It leaves three artifacts in the current directory: the full log, a `.pcap` of the unfiltered
 capture, and one line in `diag-results.csv` for consolidating several machines.
@@ -2023,7 +2025,7 @@ Keep system secure.
 > **Applies to:** Ubuntu 24.04 LTS (noble) with `mongodb-org` 8.0.x.
 > **Upstream ticket:** [SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912).
 > **Status:** mitigation in force until MongoDB ships the patched TCMalloc (see *Exit criteria*).
-> **Validated on:** `equipo-de-pruebas`, August 3, 2026.
+> **Validated on:** `test-workstation`, August 3, 2026.
 
 This section is a runbook: apply it only when the symptom shows up (Case A) or when provisioning a
 new machine (Case B). It is not part of the normal installation flow.
@@ -2445,8 +2447,8 @@ hardware alternatives usually win on time:
 If there is no network at all to download the DKMS package, use USB tethering from a phone or carry
 the `.deb` and its dependencies on a USB stick.
 
-> If you are provisioning with the Workstation `.deb` packages, `nic-driver-rescue` does this whole
-> step. It ships inside `nvidia-cuda-setup`, `-compression` and `-analytics`. It detects the
+> If you are provisioning with the project's `.deb` packages, `nic-driver-rescue` does this whole
+> step. It ships inside `nvidia-cuda-setup`, `workstation-compression` and `workstation-analytics`. It detects the
 > NIC, removes the old `r8125-dkms`, fetches the vendor one, builds for GA, strips the blacklist and
 > verifies. With `--deb PATH` or `--no-download` it works offline.
 
@@ -2547,7 +2549,7 @@ On individual machines the same control is done by the doctor scripts from
 - **Numeric `GRUB_DEFAULT`:** do not use indexes (`"1>2"`). They shift with every installed kernel
   and the machine ends up booting something else weeks later. With 7.0 purged, GRUB picks 6.8 on its
   own and nothing needs pinning.
-- **Third-party dkms:** on `equipo-de-pruebas` the `dkms` package comes from the local CUDA repo
+- **Third-party dkms:** on `test-workstation` the `dkms` package comes from the local CUDA repo
   (`dkms/unknown 1:3.2.1-1ubuntu2`) instead of noble's. Mixing versions can complicate NVIDIA module
   rebuilds on the next kernel change. If modules fail to rebuild, that is the first suspect.
   Consider `apt install dkms=3.0.11-1ubuntu13` + hold, unless CUDA 13 requires otherwise.

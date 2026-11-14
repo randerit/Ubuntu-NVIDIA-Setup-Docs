@@ -178,7 +178,7 @@ to "section sin responsable queda igual" "  1. Sistema Operativo" \
 for d in doctor_compresion.sh doctor_analitica.sh; do
   while IFS= read -r linea; do
     [[ "$linea" == 'section "1. Sistema Operativo"' ]] && continue
-    grep -qE '^section "[^"]+" "workstation-(nvidia-setup|dependencies|workstation-hardening)"$' <<<"$linea" \
+    grep -qE '^section "[^"]+" "(nvidia-cuda-setup|workstation-dependencies|workstation-hardening)"$' <<<"$linea" \
       || { echo "   FALLA: $d sin responsable: $linea"; fallos=$((fallos+1)); }
   done < <(grep -E '^section "' "$d")
 done
