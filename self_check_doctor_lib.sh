@@ -175,14 +175,14 @@ to "section muestra el responsable" "  6. CUDA Toolkit  (→ nvidia-cuda-setup)"
    bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "6. CUDA Toolkit" nvidia-cuda-setup | sed -n 3p'
 to "section sin responsable queda igual" "  1. Sistema Operativo" \
    bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; BOLD=; NC=; section "1. Sistema Operativo" | sed -n 3p'
-for d in doctor_compresion.sh doctor_analitica.sh; do
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   while IFS= read -r linea; do
     [[ "$linea" == 'section "1. Sistema Operativo"' ]] && continue
     grep -qE '^section "[^"]+" "workstation-(nvidia-setup|dependencies|workstation-hardening)"$' <<<"$linea" \
       || { echo "   FALLA: $d sin responsable: $linea"; fallos=$((fallos+1)); }
   done < <(grep -E '^section "' "$d")
 done
-for d in doctor_compresion.sh doctor_analitica.sh; do
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   grep -qxF 'section "4. SSH y Firewall" "workstation-dependencies"' "$d" \
     || { echo "   FALLA: $d section 4 debe ser workstation-dependencies"; fallos=$((fallos+1)); }
 done
@@ -208,10 +208,10 @@ t "resumen usa 'Recomendadas ([AVISO])'" 0 grep -qF 'Recomendadas ([AVISO])' doc
 t "resumen usa 'Opcionales ([NOTA])'" 0 grep -qF 'Opcionales ([NOTA])' doctor_lib.sh
 t "resumen ya no dice 'criticos'" 1 grep -qi 'criticos' doctor_lib.sh
 t "leyenda de los cuatro niveles" 0 bash -c 'grep -q necesario doctor_lib.sh && grep -q recomendado doctor_lib.sh && grep -q opcional doctor_lib.sh'
-t "[AVISO] ya no lleva '(opcional)'" 1 bash -c 'grep -E "check_and_fix_warn " doctor_compresion.sh doctor_analitica.sh | grep -q "opcional"'
-t "ningun [AVISO] escrito a mano dice 'opcional'" 1 bash -c 'grep -E "WARN\}.*opcional" doctor_compresion.sh doctor_analitica.sh | grep -q .'
-t "ningun [NOTA] escrito a mano dice 'recomendado'" 1 bash -c 'grep -E "MINOR\}.*recomendado" doctor_compresion.sh doctor_analitica.sh | grep -q .'
-for d in doctor_compresion.sh doctor_analitica.sh; do
+t "[AVISO] ya no lleva '(opcional)'" 1 bash -c 'grep -E "check_and_fix_warn " doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh | grep -q "opcional"'
+t "ningun [AVISO] escrito a mano dice 'opcional'" 1 bash -c 'grep -E "WARN\}.*opcional" doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh | grep -q .'
+t "ningun [NOTA] escrito a mano dice 'recomendado'" 1 bash -c 'grep -E "MINOR\}.*recomendado" doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh | grep -q .'
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   t "$d sale con el conteo de fallos, no de avisos" 0 grep -qF 'exit $((failed > 255 ? 1 : failed))' "$d"
 done
 
@@ -224,23 +224,26 @@ NOTA_COMUN=("htop instalado" "ncdu instalado" "tree instalado" "traceroute insta
             "libtinfo5 instalado")
 NOTA_COMPRESION=("Go instalado" "VSCode instalado" "Angry IP Scanner instalado"
                  "RustDesk instalado" "MongoDB Compass")
+NOTA_VISUALIZACION=("Go instalado" "VSCode instalado" "MongoDB Compass")
 NOTA_ANALITICA=("pandas instalado" "numpy instalado" "scikit-learn instalado"
                 "paho-mqtt instalado" "ultralytics instalado" "Node-RED instalado"
                 "Servicio nodered activo" "Servicio nodered habilitado al inicio")
-for d in doctor_compresion.sh doctor_analitica.sh; do
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   extra=("${NOTA_COMPRESION[@]}")
   [[ "$d" == doctor_analitica.sh ]] && extra=("${NOTA_ANALITICA[@]}")
+  [[ "$d" == doctor_visualizacion.sh ]] && extra=("${NOTA_VISUALIZACION[@]}")
   for desc in "${NOTA_COMUN[@]}" "${extra[@]}"; do
     # Si la linea del check no existe, el grep falla y eso tambien es un fallo.
-    grep -qF "check_and_fix_nota \"$desc" "$d" \
+    # Los bloques compartidos (Compass, EMQX...) viven en doctor_lib.sh.
+    grep -qF "check_and_fix_nota \"$desc" "$d" doctor_lib.sh \
       || { echo "   FALLA: $d: '$desc' no es check_and_fix_nota"; fallos=$((fallos+1)); }
-    grep -qF "check_and_fix \"$desc" "$d" \
+    grep -qF "check_and_fix \"$desc" "$d" doctor_lib.sh \
       && { echo "   FALLA: $d: '$desc' sigue como [FALLO]"; fallos=$((fallos+1)); }
-    grep -qF "check_and_fix_warn \"$desc" "$d" \
+    grep -qF "check_and_fix_warn \"$desc" "$d" doctor_lib.sh \
       && { echo "   FALLA: $d: '$desc' sigue como [AVISO]"; fallos=$((fallos+1)); }
   done
 done
-t "libtinfo5 ya no dice 'requerido en 24.04'" 1 grep -qF 'requerido en 24.04' doctor_compresion.sh doctor_analitica.sh
+t "libtinfo5 ya no dice 'requerido en 24.04'" 1 grep -qF 'requerido en 24.04' doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh
 
 echo "11. --skip-* del perfil: lo que el instalador omitio no cuenta como [FALLO]"
 # workstation-dependencies pasa a su doctor los mismos --skip-* con que se corrio.
@@ -249,8 +252,11 @@ t "parse_args acepta --skip-emqx y --skip-mongodb" 0 bash -c 'source ./doctor_li
 t "parse_args acepta los demas --skip-* de los perfiles" 0 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-snaps --skip-ml --skip-nodered --skip-mongo-auth'
 t "parse_args sigue rechazando un flag desconocido" 1 bash -c 'source ./doctor_lib.sh >/dev/null 2>&1; parse_args --skip-inventado'
 t "doctor_lib define SKIP_EMQX y SKIP_MONGODB por defecto en false" 0 grep -qE '^SKIP_(EMQX|MONGODB)=false' doctor_lib.sh
-t "compresion omite el bloque EMQX con --skip-emqx" 0 grep -qF 'if $SKIP_EMQX; then' doctor_compresion.sh
-for d in doctor_compresion.sh doctor_analitica.sh; do
+t "doctor_lib omite el bloque EMQX con --skip-emqx" 0 grep -qF 'if $SKIP_EMQX; then' doctor_lib.sh
+for d in doctor_compresion.sh doctor_visualizacion.sh; do
+  t "$d usa el bloque EMQX compartido" 0 grep -qxF 'check_bloque_emqx' "$d"
+done
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   t "$d omite el bloque MongoDB con --skip-mongodb" 0 grep -qF 'if $SKIP_MONGODB; then' "$d"
 done
 
@@ -258,7 +264,7 @@ echo "12. libtinfo5: la etiqueta dice que es opcional y como se instala"
 # libtinfo5 es opcional (manual). La corrida por defecto ya no la instala: la
 # etiqueta nombra el flag y dice que solo hace falta si CUDA o una herramienta
 # antigua la pide. No debe presentarla como requisito del equipo.
-for d in doctor_compresion.sh doctor_analitica.sh; do
+for d in doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh; do
   t "$d: libtinfo5 nombra el flag --libtinfo5" 0 grep -qF 'nvidia-cuda-setup --libtinfo5' "$d"
   t "$d: libtinfo5 dice que es opcional" 0 grep -qF 'opcional' "$d"
   t "$d: libtinfo5 no se presenta como requisito" 1 grep -qiE 'requerid|obligator' <(grep 'libtinfo5 instalado' "$d")
@@ -285,6 +291,66 @@ estado_mongo() {
 [[ "$(estado_mongo si --skip-mongodb)" == true ]] || { echo "   FALLA: --skip-mongodb no gana sobre una respuesta 'si'"; fallos=$((fallos+1)); }
 t "doctor_lib lee la ruta con WORKSTATION_CONF_DIR" 0 grep -qF 'WORKSTATION_CONF_DIR:-/etc/workstation' doctor_lib.sh
 t "doctor_lib lee el archivo mongodb" 0 grep -qF '/mongodb"' doctor_lib.sh
+
+echo "14. doctor_visualizacion.sh: solo lo que el perfil instala, con --skip-* honrados"
+# Perfil visualizacion: abre las interfaces web y mira el software. Lleva base,
+# MongoDB + Compass, EMQX, AnyDesk con override X11, Go y VS Code (snap). No lleva
+# GStreamer (runtime), RustDesk, Angry IP, stack ML ni Node-RED, ni abre RTSP/1880.
+# Se corre el doctor entero con sudo/ufw/ping/host falsos: sin root, sin red.
+t "doctor_visualizacion.sh existe" 0 test -f doctor_visualizacion.sh
+t "doctor_visualizacion.sh pasa bash -n" 0 bash -n doctor_visualizacion.sh
+STUBS="$TMP/stubs"
+mkdir -p "$STUBS"
+printf '#!/bin/sh\nexec "$@"\n' >"$STUBS/sudo"
+printf '#!/bin/sh\nexit 0\n' >"$STUBS/ping"
+cp "$STUBS/ping" "$STUBS/host"
+printf '#!/bin/sh\necho "Status: active"\nfor p in 22 27017 1883 18083 554 1880 80 443 6568 50001:50003; do echo "$p ALLOW Anywhere"; done\n' >"$STUBS/ufw"
+chmod +x "$STUBS"/*
+# doctor_salida <doctor> [flags...]: salida sin colores y el exit code en la ultima linea
+doctor_salida() {
+  local d="$1"; shift
+  PATH="$STUBS:$PATH" WORKSTATION_CONF_DIR="$TMP/sin_conf" timeout 120 bash "$d" "$@" </dev/null 2>&1 \
+    | sed 's/\x1b\[[0-9;]*m//g'
+  echo "RC=${PIPESTATUS[0]}"
+}
+VIZ_FULL=$(doctor_salida doctor_visualizacion.sh)
+VIZ_SKIP=$(doctor_salida doctor_visualizacion.sh --skip-mongodb --skip-emqx --skip-snaps)
+tiene() {  # tiene <esperado 0|1> <descripcion> <texto> <patron fijo>
+  local esperado="$1" desc="$2" texto="$3" patron="$4" rc=0
+  grep -qF -- "$patron" <<<"$texto" || rc=1
+  (( rc == esperado )) || { echo "   FALLA: $desc ('$patron')"; fallos=$((fallos+1)); }
+}
+for c in "Servicio mongod activo" "MongoDB Compass" "EMQX instalado" "Go instalado" \
+         "VSCode instalado" "AnyDesk con override X11" "Docker" "ffmpeg" "MQTTX"; do
+  tiene 0 "sin flags el doctor verifica" "$VIZ_FULL" "$c"
+done
+tiene 0 "--skip-mongodb avisa que omite MongoDB" "$VIZ_SKIP" "MongoDB omitido"
+tiene 0 "--skip-emqx avisa que omite EMQX" "$VIZ_SKIP" "EMQX omitido (--skip-emqx)"
+tiene 0 "--skip-snaps avisa que omite Go y VS Code" "$VIZ_SKIP" "(--skip-snaps)"
+for c in "Servicio mongod activo" "MongoDB Compass" "EMQX instalado" "Go instalado" "VSCode instalado"; do
+  tiene 1 "con --skip-* no se verifica" "$VIZ_SKIP" "$c"
+done
+tiene 0 "con --skip-* AnyDesk se sigue verificando" "$VIZ_SKIP" "AnyDesk con override X11"
+for c in "gst-launch" "RTSP" "Plugin base" "RustDesk" "Angry IP" "Node-RED" "pandas" "ultralytics" "(554)" "(1880)"; do
+  tiene 1 "visualizacion no verifica lo de otros perfiles" "$VIZ_FULL" "$c"
+done
+for c in "(22)" "(27017)" "(1883)" "(18083)" "(80)" "(443)" "(6568)" "(50001-50003)"; do
+  tiene 0 "puerto del perfil verificado" "$VIZ_FULL" "$c"
+done
+# Contrato de exit code: cantidad de [FALLO] (tope 1 si pasa de 255).
+for v in FULL SKIP; do
+  salida_v="VIZ_$v"
+  n=$(grep -c '^  \[FALLO\]' <<<"${!salida_v}")
+  rc_v=$(sed -n 's/^RC=//p' <<<"${!salida_v}")
+  (( n > 255 )) && n=1
+  [[ "$rc_v" == "$n" ]] || { echo "   FALLA: visualizacion ($v) sale con rc=$rc_v y tiene $n [FALLO]"; fallos=$((fallos+1)); }
+done
+t "visualizacion rechaza un flag desconocido" 1 bash doctor_visualizacion.sh --skip-inventado
+# Lo compartido con compresion se movio a doctor_lib.sh: compresion no cambia.
+COMP_FULL=$(doctor_salida doctor_compresion.sh)
+for c in "(554)" "(50001-50003)" "AnyDesk con override X11" "EMQX instalado" "MongoDB Compass"; do
+  tiene 0 "compresion conserva sus checks compartidos" "$COMP_FULL" "$c"
+done
 
 if (( fallos == 0 )); then
   echo "OK: todos los self-checks pasaron"

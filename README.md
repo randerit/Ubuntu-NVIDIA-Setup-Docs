@@ -1718,7 +1718,7 @@ esac
 
 ## 12. Scripts Doctor de Verificación
 
-> **Nota:** Los scripts doctor permiten verificar que todos los componentes de una estación estén instalados correctamente y, opcionalmente, instalar los faltantes de forma automática. Existen dos variantes según el tipo de estación.
+> **Nota:** Los scripts doctor permiten verificar que todos los componentes de una estación estén instalados correctamente y, opcionalmente, instalar los faltantes de forma automática. Existen tres variantes según el tipo de estación.
 
 ### Archivos
 
@@ -1727,6 +1727,7 @@ esac
 | `doctor_lib.sh` | Librería compartida con funciones de verificación, instalación y resumen. No se ejecuta directamente. |
 | `doctor_compresion.sh` | Verifica e instala componentes para estaciones de **compresión** (secciones 3-6). |
 | `doctor_analitica.sh` | Verifica e instala componentes para estaciones de **analítica** (secciones 3-5 y 7). |
+| `doctor_visualizacion.sh` | Verifica e instala componentes para estaciones de **visualización** (secciones 3-6, sin el stack de video). |
 | `self_check_doctor_lib.sh` | Prueba los chequeos de red de `doctor_lib.sh` contra árboles falsos en un tmpdir. No toca el sistema; sirve para validar cambios en la librería antes de llevarla a un equipo. |
 | `nic_lib.sh` | Librería compartida con el conocimiento canónico de las Realtek 2.5GbE: revisiones/XID, versión mínima del driver, validación del `.ko` y las dos reglas de diagnóstico (driver y chip colgado). No se ejecuta directamente. |
 | `diag-nic.sh` | Diagnóstico por capas de **un puerto** de red. Solo lee y captura; no cambia configuración. |
@@ -1884,15 +1885,17 @@ siempre, a propósito: es idempotente y barato, y repara un timer que alguien ha
 
 #### Solo verificar (sin instalar nada)
 ```bash
-chmod +x doctor_compresion.sh doctor_analitica.sh doctor_lib.sh
+chmod +x doctor_compresion.sh doctor_analitica.sh doctor_visualizacion.sh doctor_lib.sh
 ./doctor_compresion.sh      # Para estaciones de compresión
 ./doctor_analitica.sh       # Para estaciones de analítica
+./doctor_visualizacion.sh   # Para estaciones de visualización
 ```
 
 #### Verificar e instalar faltantes automáticamente
 ```bash
 ./doctor_compresion.sh --fix
 ./doctor_analitica.sh --fix
+./doctor_visualizacion.sh --fix
 ```
 
 Con `--fix` el script:
@@ -1971,6 +1974,13 @@ En el resumen:
 - Node-RED, Node.js y npm
 - Python 3, pip3 y bibliotecas ML (pandas, numpy, scikit-learn, paho-mqtt, ultralytics)
 - Puertos: 27017 (MongoDB), 1880 (Node-RED)
+
+#### Solo visualización (`doctor_visualizacion.sh`)
+- Estación que abre las interfaces web y mira el software; lleva herramientas de desarrollo por si hacen falta en el sitio
+- MongoDB y MongoDB Compass (sin autorización), EMQX, MQTTX, Docker, ffmpeg, AnyDesk con su override X11, Golang y Visual Studio Code
+- Sin GStreamer (runtime), RustDesk, Angry IP, stack ML ni Node-RED
+- Acepta `--skip-mongodb`, `--skip-emqx` y `--skip-snaps`: lo omitido se informa como `[INFO]`, no como `[FALLO]`
+- Puertos: 22 (SSH), 27017 (MongoDB), 1883 y 18083 (EMQX), AnyDesk (80, 443, 6568, 50001-50003/udp); sin RTSP 554 ni Node-RED 1880
 
 ### Troubleshooting
 - **El script falla al iniciar:** Verifica que `doctor_lib.sh` esté en el mismo directorio.

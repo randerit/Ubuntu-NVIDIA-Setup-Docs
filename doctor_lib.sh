@@ -2,7 +2,7 @@
 # =============================================================================
 # Librería Compartida - Scripts Doctor
 # Funciones comunes de verificación e instalación.
-# Uso: source doctor_lib.sh (desde doctor_compresion.sh o doctor_analitica.sh)
+# Uso: source doctor_lib.sh (desde un doctor de perfil)
 # =============================================================================
 
 # --- Colores y símbolos ---
@@ -59,6 +59,9 @@ IPSCAN_VERSION="3.9.1"
 IPSCAN_URL="https://github.com/angryip/ipscan/releases/download/${IPSCAN_VERSION}/ipscan_${IPSCAN_VERSION}_amd64.deb"
 RUSTDESK_VERSION="1.2.3"
 RUSTDESK_URL="https://github.com/rustdesk/rustdesk/releases/download/${RUSTDESK_VERSION}/rustdesk-${RUSTDESK_VERSION}-x86_64.deb"
+MQTTX_VERSION="1.13.1"
+# shellcheck disable=SC2034  # lo consume doctor_visualizacion.sh
+MQTTX_URL="https://github.com/emqx/MQTTX/releases/download/v${MQTTX_VERSION}/MQTTX_${MQTTX_VERSION}_amd64.deb"
 
 # =============================================================================
 # --- Parseo de argumentos ---
@@ -876,6 +879,127 @@ fix_gcc12() {
     sudo apt-get install -y gcc-12 g++-12 && \
     sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 120 && \
     sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 120
+}
+
+# =============================================================================
+# --- Bloques compartidos entre doctores de perfil ---
+# Los usan doctor_compresion.sh y doctor_visualizacion.sh: mismos componentes,
+# mismo texto, un solo lugar donde mantenerlos.
+# =============================================================================
+
+# MongoDB (servidor, shell, servicio) y Compass. Respeta --skip-mongodb.
+check_bloque_mongodb() {
+    if $SKIP_MONGODB; then
+        info "MongoDB omitido (este equipo no usa MongoDB): THP y mongod no aplican a este equipo"
+    else
+        check_and_fix_warn "Transparent Huge Pages habilitado (MongoDB 8 lo requiere)" \
+            "check_thp_enabled"
+
+        check_and_fix "MongoDB instalado (mongod)" \
+            "command -v mongod" \
+            "fix_mongodb_repo_and_install"
+        check_and_fix "MongoDB Shell (mongosh)" \
+            "command -v mongosh"
+        check_and_fix_warn "Servicio mongod activo" \
+            "systemctl is-active mongod" \
+            "fix_mongodb_service"
+        check_and_fix_warn "Servicio mongod habilitado al inicio" \
+            "systemctl is-enabled mongod" \
+            "sudo systemctl enable mongod"
+
+        if systemctl is-active mongod > /dev/null 2>&1; then
+            mongo_version=$(mongod --version 2>/dev/null | head -1 || echo "desconocida")
+            info "MongoDB: ${mongo_version}"
+        fi
+
+        check_and_fix_nota "MongoDB Compass >= ${MONGODB_COMPASS_VERSION} instalado" \
+            "compass_al_dia" \
+            "fix_deb_url '${MONGODB_COMPASS_URL}'"
+
+        if command -v mongodb-compass > /dev/null 2>&1; then
+            info "MongoDB Compass: $(dpkg-query -W -f='${Version}' mongodb-compass 2>/dev/null || echo desconocida)"
+        fi
+    fi
+}
+
+# EMQX (broker MQTT). Respeta --skip-emqx.
+check_bloque_emqx() {
+    if $SKIP_EMQX; then
+        info "EMQX omitido (--skip-emqx): este equipo no lo instala"
+    else
+        check_and_fix "EMQX instalado" \
+            "command -v emqx" \
+            "fix_emqx_repo_and_install"
+        check_and_fix "/etc/emqx/acl.conf presente" \
+            "test -f /etc/emqx/acl.conf" \
+            "fix_emqx_acl"
+        check_and_fix_warn "Servicio EMQX activo" \
+            "systemctl is-active emqx" \
+            "fix_emqx_service"
+        check_and_fix_warn "Servicio EMQX habilitado al inicio" \
+            "systemctl is-enabled emqx" \
+            "sudo systemctl enable emqx"
+
+        if systemctl is-active emqx > /dev/null 2>&1; then
+            info "Dashboard EMQX: http://localhost:18083"
+        fi
+    fi
+}
+
+# AnyDesk: paquete, override X11 (obligatorio) y servicio.
+check_bloque_anydesk() {
+    check_and_fix_warn "AnyDesk instalado" \
+        "command -v anydesk" \
+        "fix_anydesk_repo_and_install"
+    check_and_fix "AnyDesk con override X11 (obligatorio, Sección 6 Paso 2)" \
+        "check_anydesk_override" \
+        "fix_anydesk_override"
+    # El override se aplica sobre la unit, pero la unit puede estar muerta: un
+    # paquete instalado y un override correcto no son un AnyDesk que conecte.
+    check_and_fix_warn "Servicio AnyDesk activo" \
+        "systemctl is-active anydesk" \
+        "sudo systemctl restart anydesk"
+}
+
+# Puertos UFW. Una sola llamada a ufw, capturada en UFW_STATUS (la fija el
+# doctor): pasarle la salida de ufw a un "grep -q" por pipe es un falso negativo
+# con muchas reglas, porque grep -q corta el pipe, ufw muere con SIGPIPE y
+# pipefail propaga el 141. De paso, evita diez sudo seguidos.
+ufw_capturar_estado() {
+    # shellcheck disable=SC2034  # lo leen check_puertos_ufw_* via eval
+    UFW_STATUS=$(command -v ufw > /dev/null 2>&1 && sudo ufw status 2>/dev/null || true)
+}
+
+# SSH, MongoDB y EMQX (MQTT y Dashboard).
+check_puertos_ufw_base() {
+    check_and_fix_minor "Puerto SSH (22) configurado" \
+        "grep -qE '(^|[^0-9])22(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow ssh"
+    check_and_fix_minor "Puerto MongoDB (27017) configurado" \
+        "grep -qE '(^|[^0-9])27017(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 27017/tcp"
+    check_and_fix_minor "Puerto EMQX MQTT (1883) configurado" \
+        "grep -qE '(^|[^0-9])1883(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 1883/tcp"
+    check_and_fix_minor "Puerto EMQX Dashboard (18083) configurado" \
+        "grep -qE '(^|[^0-9])18083(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 18083/tcp"
+}
+
+# AnyDesk: HTTP, HTTPS, el puerto propio y el rango UDP.
+check_puertos_ufw_anydesk() {
+    check_and_fix_minor "Puerto AnyDesk HTTP (80) configurado" \
+        "grep -qE '(^|[^0-9])80(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 80/tcp"
+    check_and_fix_minor "Puerto AnyDesk HTTPS (443) configurado" \
+        "grep -qE '(^|[^0-9])443(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 443/tcp"
+    check_and_fix_minor "Puerto AnyDesk (6568) configurado" \
+        "grep -qE '(^|[^0-9])6568(/|[^0-9]|\$)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 6568/tcp"
+    check_and_fix_minor "Puerto AnyDesk UDP (50001-50003) configurado" \
+        "grep -qE '(^|[^0-9])50001(/|[^0-9]|\$|:)' <<<\"\$UFW_STATUS\"" \
+        "sudo ufw allow 50001:50003/udp"
 }
 
 # =============================================================================
